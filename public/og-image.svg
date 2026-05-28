@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Koyu arka plan -->
+  <rect width="1200" height="630" fill="#0A0A0A"/>
+
+  <!-- Subtle grid (mavi devre teması) -->
+  <g stroke="#1E40AF" stroke-width="0.5" opacity="0.15">
+    <path d="M 0 100 L 1200 100"/>
+    <path d="M 0 200 L 1200 200"/>
+    <path d="M 0 300 L 1200 300"/>
+    <path d="M 0 400 L 1200 400"/>
+    <path d="M 0 500 L 1200 500"/>
+    <path d="M 200 0 L 200 630"/>
+    <path d="M 400 0 L 400 630"/>
+    <path d="M 600 0 L 600 630"/>
+    <path d="M 800 0 L 800 630"/>
+    <path d="M 1000 0 L 1000 630"/>
+  </g>
+
+  <!-- Marka Q sol tarafta büyük -->
+  <text x="180" y="380"
+        font-family="ui-monospace, monospace"
+        font-size="320"
+        font-weight="700"
+        text-anchor="middle"
+        fill="#FF6B1A">Q</text>
+
+  <!-- Crystal aksan -->
+  <circle cx="320" cy="280" r="20" fill="#FFB300" opacity="0.9"/>
+
+  <!-- Marka adı -->
+  <text x="450" y="290"
+        font-family="ui-monospace, monospace"
+        font-size="80"
+        font-weight="700"
+        fill="#F5F5F5"
+        letter-spacing="8">QUANTIX</text>
+
+  <!-- Tagline -->
+  <text x="450" y="345"
+        font-family="ui-monospace, monospace"
+        font-size="28"
+        font-weight="500"
+        fill="#C0C5CC"
+        letter-spacing="4">Advanced AI Trading Systems</text>
+
+  <!-- Alt çizgi turuncu -->
+  <rect x="450" y="370" width="200" height="3" fill="#FF6B1A"/>
+
+  <!-- Alt bilgi (küçük metin) -->
+  <text x="450" y="430"
+        font-family="ui-monospace, monospace"
+        font-size="20"
+        fill="#707070"
+        letter-spacing="2">BTC · ETH · OKX · Disciplined Futures Trading</text>
+</svg>

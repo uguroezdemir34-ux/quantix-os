@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <rect width="180" height="180" rx="36" fill="#0A0A0A"/>
+  <!-- Circuit ışıltı arka plan -->
+  <g stroke="#1E40AF" stroke-width="1" fill="none" opacity="0.4">
+    <path d="M 20 90 L 50 90 L 50 60 L 80 60"/>
+    <path d="M 160 90 L 130 90 L 130 60 L 100 60"/>
+    <path d="M 90 160 L 90 130 L 60 130 L 60 100"/>
+  </g>
+  <!-- Marka Q -->
+  <text x="90" y="120"
+        font-family="ui-monospace, monospace"
+        font-size="100"
+        font-weight="700"
+        text-anchor="middle"
+        fill="#FF6B1A">Q</text>
+  <!-- Tagline -->
+  <text x="90" y="155"
+        font-family="ui-monospace, monospace"
+        font-size="12"
+        font-weight="600"
+        text-anchor="middle"
+        fill="#C0C5CC"
+        letter-spacing="2">QUANTIX</text>
+</svg>
