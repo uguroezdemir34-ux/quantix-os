@@ -327,3 +327,4 @@ Her paket için iki katman doğrulama:
 - **Yan kanal doğrulama**: bilgisayar dışında bağımsız araç (Python `hmac` vs)
 
 Her bulgu `BUG_LOG.md`'ye kaydedilir, `AC-{paket}-{sıra}` ID'siyle.
+deploy
