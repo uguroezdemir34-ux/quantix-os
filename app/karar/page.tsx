@@ -29,6 +29,7 @@ import { getOkxAdapter } from "@/lib/exchange/okx-adapter";
 import { createChannel } from "@/lib/notify/registry";
 import { getGlobalDedupeStore } from "@/lib/orchestrator/dedupe";
 import type { PositionSizerResult } from "@/lib/sizer/types";
+import { useFlowIntelligence } from "@/lib/hooks/useFlowIntelligence";
 
 export default function KararPage() {
   const [activePair, setActivePair] = useState<Pair>("BTC");
@@ -46,6 +47,12 @@ export default function KararPage() {
   const riskStore = useRiskStore();
   const tradesStore = useTradesStore();
   const macroStore = useMacroStore();
+
+  // Signal direction for flow intelligence (uppercase: "LONG" | "SHORT")
+  const signalDir: "LONG" | "SHORT" =
+    result?.direction === "SHORT" ? "SHORT" : "LONG";
+
+  const flowResult = useFlowIntelligence(activePair, signalDir);
 
   const atrValue = useMemo(() => {
     if (candles1h.length < 15) return null;
@@ -244,7 +251,7 @@ export default function KararPage() {
             threshold={result.effectiveThreshold}
             goThreshold={result.goThreshold}
           />
-          <FlowAlignmentRow flow={null} />
+          <FlowAlignmentRow flow={flowResult} />
           <ScoreBreakdown sub={result.sub} reasons={result.reasons} />
           <BlocksList
             hardBlocks={result.blocks}

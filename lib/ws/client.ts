@@ -27,9 +27,11 @@ import { parseAnyMessage } from "./messages";
 import { getFirstEndpoint, getNextEndpoint } from "./urls";
 import { getReconnectDelay } from "./backoff";
 import type { Pair } from "@/lib/constants/pairs";
+import type { OkxTradeRaw } from "@/lib/orderflow/types";
 
 type TickListener = (tick: Tick) => void;
 type StatusListener = (state: ConnectionState) => void;
+type TradeRawListener = (pair: Pair, raws: OkxTradeRaw[]) => void;
 
 /** WebSocket abstraction (test mock'u için) */
 export interface WsLike {
@@ -92,6 +94,7 @@ export class OkxWsClient {
   // Listener'lar
   private tickListeners = new Set<TickListener>();
   private statusListeners = new Set<StatusListener>();
+  private tradeRawListeners = new Set<TradeRawListener>();
 
   constructor(opts: OkxWsClientOptions = {}) {
     this.wsFactory = opts.wsFactory ?? defaultWsFactory;
@@ -116,6 +119,12 @@ export class OkxWsClient {
   onTick(cb: TickListener): () => void {
     this.tickListeners.add(cb);
     return () => this.tickListeners.delete(cb);
+  }
+
+  /** Raw OKX trade batch listener (order flow için). */
+  onTradeRaw(cb: TradeRawListener): () => void {
+    this.tradeRawListeners.add(cb);
+    return () => this.tradeRawListeners.delete(cb);
   }
 
   /** Status event listener ekle */
@@ -168,6 +177,7 @@ export class OkxWsClient {
     this.updateState({ status: "destroyed" });
     this.tickListeners.clear();
     this.statusListeners.clear();
+    this.tradeRawListeners.clear();
   }
 
   /** Mevcut bağlantıyı kapat (reconnect tetiklenir) */
@@ -223,6 +233,12 @@ export class OkxWsClient {
     } catch {
       return; // Bozuk JSON
     }
+
+    // Order flow: OKX trades channel → raw emit (side + sz dahil)
+    if (this.tradeRawListeners.size > 0) {
+      this.tryEmitTradeRaw(parsed);
+    }
+
     const ticks = parseAnyMessage(parsed, this.timers.now(), this.open24hByPair);
     if (!ticks) return;
 
@@ -328,6 +344,48 @@ export class OkxWsClient {
   private updateState(partial: Partial<ConnectionState>): void {
     this.state = { ...this.state, ...partial };
     for (const cb of this.statusListeners) cb(this.state);
+  }
+
+  private tryEmitTradeRaw(parsed: unknown): void {
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !("arg" in parsed) ||
+      !("data" in parsed)
+    ) return;
+    const p = parsed as { arg?: { channel?: string; instId?: string }; data?: unknown[] };
+    if (p.arg?.channel !== "trades") return;
+    const instId = p.arg?.instId ?? "";
+    // instId → pair (BTC-USDT-SWAP → BTC, ETH-USDT-SWAP → ETH)
+    const pair: Pair | null = instId.startsWith("BTC")
+      ? "BTC"
+      : instId.startsWith("ETH")
+      ? "ETH"
+      : null;
+    if (!pair || !Array.isArray(p.data)) return;
+    const raws: OkxTradeRaw[] = [];
+    for (const item of p.data) {
+      if (
+        item &&
+        typeof item === "object" &&
+        "px" in item &&
+        "sz" in item &&
+        "side" in item &&
+        "tradeId" in item &&
+        "ts" in item
+      ) {
+        raws.push({
+          instId,
+          px: String((item as Record<string, unknown>).px),
+          sz: String((item as Record<string, unknown>).sz),
+          side: (item as Record<string, unknown>).side as "buy" | "sell",
+          tradeId: String((item as Record<string, unknown>).tradeId),
+          ts: String((item as Record<string, unknown>).ts),
+        });
+      }
+    }
+    if (raws.length === 0) return;
+    for (const cb of this.tradeRawListeners) cb(pair, raws);
   }
 
   private emitTick(tick: Tick): void {

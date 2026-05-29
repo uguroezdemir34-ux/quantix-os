@@ -18,6 +18,7 @@
 import { useEffect } from "react";
 import { OkxWsClient } from "./client";
 import { useMarketStore } from "@/lib/store/marketStore";
+import { setActiveMarketClient } from "./marketClientRef";
 
 // Module-level singleton
 let activeClient: OkxWsClient | null = null;
@@ -37,6 +38,7 @@ export function useMarketStream(): void {
     // İlk subscriber → client'ı oluştur ve başlat
     if (!activeClient) {
       activeClient = new OkxWsClient({ autoConnect: true });
+      setActiveMarketClient(activeClient);
 
       const { pushTick, setConnection } = useMarketStore.getState();
 
@@ -52,6 +54,7 @@ export function useMarketStream(): void {
       if (activeSubscriberCount <= 0 && activeClient) {
         activeClient.destroy();
         activeClient = null;
+        setActiveMarketClient(null);
         activeSubscriberCount = 0;
         useMarketStore.getState().reset();
       }
@@ -67,6 +70,7 @@ export function _resetMarketStreamForTesting(): void {
   if (activeClient) {
     activeClient.destroy();
     activeClient = null;
+    setActiveMarketClient(null);
   }
   activeSubscriberCount = 0;
 }

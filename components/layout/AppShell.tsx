@@ -36,6 +36,7 @@ import { useTrailingManager } from "@/lib/hooks/useTrailingManager";
 import { useBalancePoller } from "@/lib/hooks/useBalancePoller";
 import { useMacroPoller } from "@/lib/hooks/useMacroPoller";
 import { useDailyPnlTracker } from "@/lib/hooks/useDailyPnlTracker";
+import { useTradeFeed } from "@/lib/hooks/useTradeFeed";
 
 export function AppShell({
   children,
@@ -63,6 +64,8 @@ export function AppShell({
   useMacroPoller();
   // Günlük P&L takip → drawdown protokol tier güncelle (güvenlik kritik)
   useDailyPnlTracker();
+  // Order flow trade feed → tradeFeedStore (CVD/VPIN/SMC için)
+  useTradeFeed();
 
   useEffect(() => {
     rehydrateSettings();
