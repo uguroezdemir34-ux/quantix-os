@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useScoreStore } from "@/lib/store/scoreStore";
+import { useCandleStore } from "@/lib/store/candleStore";
+import { useMarketStore } from "@/lib/store/marketStore";
+import { useAccountStore } from "@/lib/store/accountStore";
+import { useSettingsStore } from "@/lib/store/settingsStore";
+import { useRiskStore } from "@/lib/store/riskStore";
+import { useTradesStore } from "@/lib/store/tradesStore";
+import { useMacroStore } from "@/lib/store/macroStore";
 import { PAIRS, type Pair } from "@/lib/constants/pairs";
 import { VerdictBadge } from "@/components/karar/VerdictBadge";
 import { ScoreBar } from "@/components/karar/ScoreBar";
@@ -10,11 +17,152 @@ import { BlocksList } from "@/components/karar/BlocksList";
 import { ReasonsList } from "@/components/karar/ReasonsList";
 import { DirectionBadge } from "@/components/karar/DirectionBadge";
 import { FlowAlignmentRow } from "@/components/karar/FlowAlignmentRow";
+import { PositionSizer } from "@/components/karar/PositionSizer";
+import { TradeConfirmModal } from "@/components/karar/TradeConfirmModal";
+import { computePositionSize } from "@/lib/sizer/position";
+import { atr } from "@/lib/indicators/atr";
+import { toIndicatorCandle } from "@/lib/okx/candles";
+import { orchestrate } from "@/lib/orchestrator/router";
+import { getOkxAdapter } from "@/lib/exchange/okx-adapter";
+import { createChannel } from "@/lib/notify/registry";
+import { getGlobalDedupeStore } from "@/lib/orchestrator/dedupe";
+import type { PositionSizerResult } from "@/lib/sizer/types";
 
 export default function KararPage() {
   const [activePair, setActivePair] = useState<Pair>("BTC");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [execError, setExecError] = useState<string | null>(null);
+
   const result = useScoreStore((s) => s.results[activePair]);
   const computing = useScoreStore((s) => s.computing);
+  const candles1h = useCandleStore((s) => s.candles[`${activePair}_1h`] ?? []);
+  const livePrice = useMarketStore((s) => s.prices[activePair]?.last ?? null);
+  const accountStore = useAccountStore();
+  const settings = useSettingsStore();
+  const riskStore = useRiskStore();
+  const tradesStore = useTradesStore();
+  const macroStore = useMacroStore();
+
+  const atrValue = useMemo(() => {
+    if (candles1h.length < 15) return null;
+    return atr(candles1h.map(toIndicatorCandle), { period: 14 });
+  }, [candles1h]);
+
+  const sizerResult = useMemo<PositionSizerResult | null>(() => {
+    if (!result || result.verdict !== "go") return null;
+    if (!livePrice || !atrValue) return null;
+    if (result.direction !== "LONG" && result.direction !== "SHORT") return null;
+
+    const protocol = accountStore.drawdownProtocol;
+    return computePositionSize({
+      pair: activePair,
+      direction: result.direction,
+      px: livePrice,
+      atr: atrValue,
+      adx1h: null,
+      swingLow: null,
+      swingHigh: null,
+      balance: {
+        total: accountStore.balanceTotal,
+        free: accountStore.balanceFree,
+      },
+      drawdownProtocol: {
+        tier: protocol.tier,
+        multiplier: protocol.multiplier,
+        label: protocol.label,
+      },
+      bucket: {
+        n: 0,
+        wr: null,
+        isCut: false,
+        isBoost: false,
+        hasData: false,
+        min: 0,
+        max: 0,
+      },
+      score: result.score,
+    });
+  }, [result, livePrice, atrValue, activePair, accountStore]);
+
+  async function handleConfirm() {
+    if (!sizerResult || !result || !livePrice) return;
+    if (result.direction !== "LONG" && result.direction !== "SHORT") return;
+
+    setIsExecuting(true);
+    setExecError(null);
+
+    const today = new Date();
+    const todayTrades = tradesStore.trades.filter((t) => {
+      const d = new Date(t.openedAt);
+      return (
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate()
+      );
+    });
+
+    const fundingResult =
+      activePair === "BTC" ? macroStore.fundingBtc : macroStore.fundingEth;
+
+    try {
+      const output = await orchestrate(
+        {
+          signal: result,
+          pair: activePair,
+          livePrice,
+          qty: sizerResult.qty,
+          stopPrice: sizerResult.stop.stopPrice,
+          takeProfitPrice: sizerResult.tp.tp1Price,
+          leverage: sizerResult.leverage,
+          marginMode: "cross",
+          source: "manual",
+          accountState: {
+            drawdownProtocol: accountStore.drawdownProtocol,
+            btcCooldownUntil: riskStore.btcCooldownUntil,
+            btcSelfCooldownUntil: riskStore.btcSelfCooldownUntil,
+            todayTradeCount: todayTrades.length,
+            maxTradesPerDay: settings.maxTradesPerDay,
+          },
+        },
+        {
+          adapter: getOkxAdapter(settings.demoMode),
+          channels: [createChannel("telegram")],
+          dedupeStore: getGlobalDedupeStore(),
+        },
+      );
+
+      if (output.ok) {
+        tradesStore.openPending({
+          pair: activePair,
+          direction: result.direction,
+          entryPrice: livePrice,
+          qty: sizerResult.qty,
+          leverage: sizerResult.leverage,
+          stopPrice: sizerResult.stop.stopPrice,
+          takeProfit1: sizerResult.tp.tp1Price,
+          takeProfit2: sizerResult.tp.tp2Price,
+          riskAmountUsd: sizerResult.risk.riskUsd,
+          isPaper: settings.demoMode,
+          entryContext: {
+            score: result.score,
+            verdict: result.verdict,
+            fgValue: macroStore.fgValue ?? undefined,
+            fundingRate: fundingResult?.fundingRate ?? undefined,
+            drawdownTier: accountStore.drawdownProtocol.tier,
+          },
+          orderId: output.tradeResult?.data?.orderId,
+        });
+        setShowConfirm(false);
+      } else {
+        setExecError(output.reasonHuman);
+      }
+    } catch (e) {
+      setExecError(e instanceof Error ? e.message : "Bilinmeyen hata");
+    } finally {
+      setIsExecuting(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -65,7 +213,39 @@ export default function KararPage() {
             softBlocks={result.softBlocks}
           />
           <ReasonsList reasons={result.reasons} />
+
+          {sizerResult && (
+            <PositionSizer
+              result={sizerResult}
+              onTrade={() => {
+                setExecError(null);
+                setShowConfirm(true);
+              }}
+            />
+          )}
+
+          {execError && (
+            <div className="bg-soft-red text-signal-red rounded-lg p-3 font-mono text-xs">
+              {execError}
+            </div>
+          )}
         </>
+      )}
+
+      {showConfirm && sizerResult && (
+        <TradeConfirmModal
+          result={sizerResult}
+          onClose={() => setShowConfirm(false)}
+          onConfirm={handleConfirm}
+        />
+      )}
+
+      {isExecuting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-bg-card rounded-lg p-6 font-mono text-sm text-text-t1">
+            Emir gönderiliyor...
+          </div>
+        </div>
       )}
     </div>
   );

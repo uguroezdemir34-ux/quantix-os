@@ -1,10 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { usePositionStore } from "@/lib/store/positionStore";
 import { useTradesStore } from "@/lib/store/tradesStore";
+import { useSettingsStore } from "@/lib/store/settingsStore";
 import { PositionCard } from "@/components/pozisyon/PositionCard";
 import { PositionEmptyState } from "@/components/pozisyon/PositionEmptyState";
 import { TradeTimelineCard } from "@/components/pozisyon/TradeTimelineCard";
+import { CloseConfirmModal } from "@/components/pozisyon/CloseConfirmModal";
+import { getOkxAdapter } from "@/lib/exchange/okx-adapter";
+import type { Position } from "@/lib/okx/positions";
 
 export default function PozisyonPage() {
   const positions = usePositionStore((s) => s.positions);
@@ -12,22 +17,29 @@ export default function PozisyonPage() {
   const setClosingInstId = usePositionStore((s) => s.setClosingInstId);
   const removePosition = usePositionStore((s) => s.removePosition);
   const trades = useTradesStore((s) => s.trades);
+  const demoMode = useSettingsStore((s) => s.demoMode);
 
-  async function handleClose(instId: string) {
-    setClosingInstId(instId);
+  const [confirmPosition, setConfirmPosition] = useState<Position | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
+
+  async function handleClose(pos: Position) {
+    setCloseError(null);
+    setClosingInstId(pos.instId);
     try {
-      const res = await fetch("/api/okx/api/v5/trade/close-position", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isDemo: false,
-          body: { instId, mgnMode: "cross" },
-        }),
+      const adapter = getOkxAdapter(demoMode);
+      const result = await adapter.closePosition({
+        instId: pos.instId,
+        mgnMode: pos.mgnMode,
+        posSide: pos.direction === "LONG" ? "long" : "short",
       });
-      const data = await res.json();
-      if (data.ok) {
-        removePosition(instId);
+      if (result.ok) {
+        removePosition(pos.instId);
+        setConfirmPosition(null);
+      } else {
+        setCloseError(result.errorMessage ?? "Kapatma başarısız");
       }
+    } catch (e) {
+      setCloseError(e instanceof Error ? e.message : "Bilinmeyen hata");
     } finally {
       setClosingInstId(null);
     }
@@ -42,12 +54,27 @@ export default function PozisyonPage() {
           <PositionCard
             key={pos.instId}
             position={pos}
-            onClose={() => handleClose(pos.instId)}
+            onClose={() => setConfirmPosition(pos)}
             isClosing={closingInstId === pos.instId}
           />
         ))
       )}
+
+      {closeError && (
+        <div className="bg-soft-red text-signal-red rounded-lg p-3 font-mono text-xs">
+          {closeError}
+        </div>
+      )}
+
       <TradeTimelineCard trades={trades} limit={10} />
+
+      {confirmPosition && (
+        <CloseConfirmModal
+          position={confirmPosition}
+          onClose={() => setConfirmPosition(null)}
+          onConfirm={() => handleClose(confirmPosition)}
+        />
+      )}
     </div>
   );
 }
