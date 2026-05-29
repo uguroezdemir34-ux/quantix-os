@@ -26,6 +26,9 @@ import { AppHeader } from "./AppHeader";
 import { BottomNav } from "./BottomNav";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { useMarketStream } from "@/lib/ws/useMarketStream";
+import { useCandlePoller } from "@/lib/hooks/useCandlePoller";
+import { usePositionPoller } from "@/lib/hooks/usePositionPoller";
+import { useScoreEngine } from "@/lib/hooks/useScoreEngine";
 
 export function AppShell({
   children,
@@ -36,6 +39,12 @@ export function AppShell({
 
   // Real-time market data stream (BTC + ETH WS bağlantısı)
   useMarketStream();
+  // Candle polling (30s)
+  useCandlePoller();
+  // Position polling (10s)
+  usePositionPoller();
+  // Score engine (candle değişince tetiklenir)
+  useScoreEngine();
 
   useEffect(() => {
     rehydrate();
