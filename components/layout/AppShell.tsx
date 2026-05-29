@@ -35,6 +35,7 @@ import { useScoreEngine } from "@/lib/hooks/useScoreEngine";
 import { useTrailingManager } from "@/lib/hooks/useTrailingManager";
 import { useBalancePoller } from "@/lib/hooks/useBalancePoller";
 import { useMacroPoller } from "@/lib/hooks/useMacroPoller";
+import { useDailyPnlTracker } from "@/lib/hooks/useDailyPnlTracker";
 
 export function AppShell({
   children,
@@ -60,6 +61,8 @@ export function AppShell({
   useBalancePoller();
   // Macro poller: F&G + dominans + funding (5dk)
   useMacroPoller();
+  // Günlük P&L takip → drawdown protokol tier güncelle (güvenlik kritik)
+  useDailyPnlTracker();
 
   useEffect(() => {
     rehydrateSettings();

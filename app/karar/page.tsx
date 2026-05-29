@@ -21,6 +21,7 @@ import { PositionSizer } from "@/components/karar/PositionSizer";
 import { TradeConfirmModal } from "@/components/karar/TradeConfirmModal";
 import { computePositionSize } from "@/lib/sizer/position";
 import { atr } from "@/lib/indicators/atr";
+import { adx } from "@/lib/indicators/adx";
 import { toIndicatorCandle } from "@/lib/okx/candles";
 import { findSwingLevels } from "@/lib/sr/swing";
 import { orchestrate } from "@/lib/orchestrator/router";
@@ -49,6 +50,12 @@ export default function KararPage() {
   const atrValue = useMemo(() => {
     if (candles1h.length < 15) return null;
     return atr(candles1h.map(toIndicatorCandle), { period: 14 });
+  }, [candles1h]);
+
+  // ADX ham değeri — TP modunu belirlemek için (weak/healthy/strong)
+  const adxValue = useMemo(() => {
+    if (candles1h.length < 29) return null;
+    return adx(candles1h.map(toIndicatorCandle), 14)?.adx ?? null;
   }, [candles1h]);
 
   // Swing seviyeleri — yapısal stop için
@@ -80,7 +87,7 @@ export default function KararPage() {
       direction: result.direction,
       px: livePrice,
       atr: atrValue,
-      adx1h: null,
+      adx1h: adxValue,
       swingLow: swingLevels.swingLow,
       swingHigh: swingLevels.swingHigh,
       balance: {
@@ -103,7 +110,7 @@ export default function KararPage() {
       },
       score: result.score,
     });
-  }, [result, livePrice, atrValue, swingLevels, activePair, accountStore]);  // eslint-disable-line
+  }, [result, livePrice, atrValue, adxValue, swingLevels, activePair, accountStore]);
 
   async function handleConfirm() {
     if (!sizerResult || !result || !livePrice) return;
