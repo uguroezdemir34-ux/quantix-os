@@ -16,6 +16,7 @@ import type {
   AccountStateSnapshot,
 } from "./types";
 import type { Pair } from "@/lib/constants/pairs";
+import { checkDataHealth } from "./circuit-breaker";
 
 export interface PreflightCheckResult {
   passed: boolean;
@@ -31,6 +32,19 @@ export function runPreflightChecks(
   input: OrchestrateInput,
   now: number = Date.now(),
 ): PreflightCheckResult {
+  // 0. Veri sağlığı (circuit breaker) — veri donmuşsa diğer kontrollerin anlamı yok
+  if (input.accountState.dataHealth !== undefined) {
+    const { connectionStatus, lastTickAt } = input.accountState.dataHealth;
+    const health = checkDataHealth(connectionStatus, lastTickAt, now);
+    if (!health.healthy) {
+      return {
+        passed: false,
+        decision: "blocked_data_frozen",
+        reasonHuman: health.reason ?? "Price data unavailable",
+      };
+    }
+  }
+
   // 1. Verdict GO olmalı
   if (input.signal.verdict !== "go") {
     return {

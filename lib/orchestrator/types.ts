@@ -56,6 +56,16 @@ export interface AccountStateSnapshot {
   todayTradeCount: number;
   /** Günlük max trade limiti (default 2) */
   maxTradesPerDay: number;
+  /**
+   * Veri sağlığı — circuit breaker için.
+   * undefined ise data health kontrolü atlanır (geriye dönük uyumluluk).
+   */
+  dataHealth?: {
+    /** WS bağlantı durumu */
+    connectionStatus: import("@/lib/ws/types").ConnectionStatus;
+    /** Son tick alınan zaman (epoch ms) */
+    lastTickAt: number;
+  };
 }
 
 // ═══════════════ DECISION ═══════════════
@@ -73,6 +83,7 @@ export type OrchestratorDecision =
   | "blocked_lock" // BTC cooldown veya self cooldown
   | "blocked_daily_limit" // todayTradeCount >= maxTradesPerDay
   | "blocked_dedup" // son 30sn'de aynı sinyal var
+  | "blocked_data_frozen" // fiyat verisi 15s+ donmuş / WS + REST her ikisi de sağlıksız
   // Başarısız
   | "failed_exchange"; // adapter.openPosition başarısız
 
