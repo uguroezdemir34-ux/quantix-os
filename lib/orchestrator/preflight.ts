@@ -19,6 +19,7 @@ import type { Pair } from "@/lib/constants/pairs";
 import { checkDataHealth } from "./circuit-breaker";
 import { computeEquityCurveDecision } from "@/lib/risk/equity-curve";
 import { checkCorrelationLimit } from "@/lib/risk/correlation";
+import { checkExposure } from "@/lib/risk/exposure";
 
 export interface PreflightCheckResult {
   passed: boolean;
@@ -111,6 +112,39 @@ export function runPreflightChecks(
           passed: false,
           decision: "blocked_correlation",
           reasonHuman: corrCheck.reason ?? "Correlation limit exceeded",
+        };
+      }
+    }
+  }
+
+  // 5b. Exposure cap kontrolü — kümülatif margin equity'nin %25'ini aşamaz
+  if (
+    input.accountState.openPositionsWithMargin !== undefined &&
+    input.accountState.equityUsd !== undefined
+  ) {
+    const direction = input.signal.direction;
+    if (direction === "LONG" || direction === "SHORT") {
+      // input.qty × livePrice / leverage → margin estimate
+      // Preflight'ta kesin margin yoksa requestedMargin=0 ile sadece current
+      // durumu kontrol ediyoruz (conservative: mevcut durum bile limit aşıyorsa bloke)
+      const estimatedMargin =
+        input.qty > 0 && input.livePrice > 0 && input.leverage > 0
+          ? (input.qty * input.livePrice) / input.leverage
+          : 1; // en az 1 USD talep et (sıfır talep = her zaman allowed)
+
+      const exposureCheck = checkExposure(
+        estimatedMargin,
+        direction,
+        input.accountState.equityUsd,
+        input.accountState.openPositionsWithMargin,
+        input.accountState.exposureConfig,
+      );
+
+      if (exposureCheck.verdict === "blocked") {
+        return {
+          passed: false,
+          decision: "blocked_exposure",
+          reasonHuman: exposureCheck.reason,
         };
       }
     }

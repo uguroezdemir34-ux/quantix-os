@@ -84,6 +84,21 @@ export interface AccountStateSnapshot {
    * undefined ise default (maxSameDirection=1) kullanılır.
    */
   correlationConfig?: import("@/lib/risk/correlation").CorrelationLimitConfig;
+  /**
+   * Exposure kontrolü için genişletilmiş pozisyon özeti (margin dahil).
+   * undefined ise exposure kontrolü atlanır.
+   */
+  openPositionsWithMargin?: readonly import("@/lib/risk/exposure").ExposurePosition[];
+  /**
+   * Exposure kontrolü için net kasa büyüklüğü (USDT).
+   * undefined ise exposure kontrolü atlanır.
+   */
+  equityUsd?: number;
+  /**
+   * Exposure cap konfigürasyonu.
+   * undefined ise default (totalCap=%25, directionalCap=%20) kullanılır.
+   */
+  exposureConfig?: import("@/lib/risk/exposure").ExposureConfig;
 }
 
 // ═══════════════ DECISION ═══════════════
@@ -104,6 +119,7 @@ export type OrchestratorDecision =
   | "blocked_data_frozen" // fiyat verisi 15s+ donmuş / WS + REST her ikisi de sağlıksız
   | "blocked_equity_curve" // haftalık/aylık drawdown eşiği aşıldı
   | "blocked_correlation" // aynı yönde çok fazla açık pozisyon var
+  | "blocked_exposure"   // kümülatif marjin equity cap'ini aşıyor
   // Başarısız
   | "failed_exchange"; // adapter.openPosition başarısız
 
