@@ -25,7 +25,7 @@
  *   - Sync sonrası kayıp pozisyonlar trail'den silinir
  */
 
-import { KademeliTrailingStop } from "./kademeli";
+import { KademeliTrailingStop, type TrailDurum } from "./kademeli";
 import {
   loadTrails,
   saveTrails,
@@ -43,6 +43,11 @@ import type { OkxKline, OkxPosition } from "@/types/okx";
  * Browser'da gerçek OKX/Telegram fonksiyonları geçilir.
  * Testte mock'lar geçilir.
  */
+/** UI için trail durumu — getDurum() dönüş tipi. */
+export interface TrailUiDurum extends TrailDurum {
+  rallyActivated: boolean;
+}
+
 export interface TrailingDeps {
   /** Mevcut açık pozisyonlar (ST.positions analogu) */
   getPositions(): readonly OkxPosition[];
@@ -142,8 +147,10 @@ export class TrailingManager {
   }
 
   /** Belli bir instId için durum (UI gösterimi). */
-  getDurum(instId: string) {
-    return this.trails[instId]?.instance.durum();
+  getDurum(instId: string): TrailUiDurum | undefined {
+    const trail = this.trails[instId];
+    if (!trail) return undefined;
+    return { ...trail.instance.durum(), rallyActivated: trail.rallyActivated };
   }
 
   /**

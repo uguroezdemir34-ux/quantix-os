@@ -13,6 +13,7 @@ import { usePositionStore } from "@/lib/store/positionStore";
 import { useCandleStore } from "@/lib/store/candleStore";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { TrailingManager } from "@/lib/trailing/manager";
+import { setActiveTrailingManager } from "@/lib/trailing/managerRef";
 import { getOkxAdapter } from "@/lib/exchange/okx-adapter";
 import { createChannel } from "@/lib/notify/registry";
 import type { OkxPosition, OkxKline } from "@/types/okx";
@@ -107,9 +108,11 @@ export function useTrailingManager(): void {
     manager.load();
     manager.start();
     managerRef.current = manager;
+    setActiveTrailingManager(manager);
 
     return () => {
       manager.stop();
+      setActiveTrailingManager(null);
     };
   }, [demoMode]);
 }

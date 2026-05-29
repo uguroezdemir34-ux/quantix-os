@@ -11,6 +11,7 @@
  *   Close button
  */
 
+import { useState, useEffect, useRef } from "react";
 import { useT, useLocale } from "@/lib/i18n/context";
 import { formatPrice, formatPercent, formatCoinAmount } from "@/lib/i18n/format";
 import { useMarketStore } from "@/lib/store/marketStore";
@@ -20,6 +21,8 @@ import {
   computeTpProgress,
   categorizeHoldingDuration,
 } from "@/lib/sizer/position-pnl";
+import { getActiveTrailingManager } from "@/lib/trailing/managerRef";
+import type { TrailUiDurum } from "@/lib/trailing/manager";
 import type { Position } from "@/lib/okx/positions";
 
 export function PositionCard({
@@ -34,6 +37,21 @@ export function PositionCard({
   const t = useT();
   const locale = useLocale();
   const tick = useMarketStore((s) => s.prices[position.pair]);
+
+  // Trail stop durumu — 3 saniyede bir yenile (manager dışarıdan event yayınlamıyor)
+  const [trailDurum, setTrailDurum] = useState<TrailUiDurum | null>(null);
+  const trailIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    function refresh() {
+      const d = getActiveTrailingManager()?.getDurum(position.instId) ?? null;
+      setTrailDurum(d);
+    }
+    refresh();
+    trailIntervalRef.current = setInterval(refresh, 3000);
+    return () => {
+      if (trailIntervalRef.current) clearInterval(trailIntervalRef.current);
+    };
+  }, [position.instId]);
 
   const currentPx = tick?.last ?? position.markPx;
   const liveUpl = computeLiveUpl(position, currentPx);
@@ -146,6 +164,57 @@ export function PositionCard({
         />
       </div>
 
+      {/* Trailing stop satırı (ralli aktifleşince görünür) */}
+      {trailDurum && (
+        <div className="border-border mt-3 border-t pt-3">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-text-t3 font-mono text-2xs tracking-wider">
+                {t("position.trailStop")}
+              </span>
+              {trailDurum.rallyActivated ?? false ? (
+                <span className="bg-warning/15 text-warning rounded px-1.5 py-0.5 font-mono text-2xs font-bold tracking-wider">
+                  {t("position.trailRally")}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-text-t4 font-mono text-2xs">
+                {t("position.trailMult")}{trailDurum.atr_carpan.toFixed(2)}
+              </span>
+              <span className="text-text-t4 font-mono text-2xs">
+                {t("position.trailPeak")} {trailDurum.peak_kar_yuzde.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className={`font-mono tabular-nums text-sm font-semibold ${
+              trailDurum.aktif_stop
+                ? isLong ? "text-signal-red" : "text-signal-green"
+                : "text-text-t4"
+            }`}>
+              {trailDurum.aktif_stop
+                ? formatPrice(trailDurum.aktif_stop, locale)
+                : t("position.trailNoStop")}
+            </span>
+            {trailDurum.en_iyi_fiyat && (
+              <span className="text-text-t4 font-mono text-2xs tabular-nums">
+                ↑ {formatPrice(trailDurum.en_iyi_fiyat, locale)}
+              </span>
+            )}
+          </div>
+          {/* Trail stop mesafe barı — stop ne kadar yakın? */}
+          {trailDurum.aktif_stop && currentPx > 0 && (
+            <TrailDistanceBar
+              stopPx={trailDurum.aktif_stop}
+              currentPx={currentPx}
+              entryPx={position.entryPx}
+              isLong={isLong}
+            />
+          )}
+        </div>
+      )}
+
       {/* TP1 progress bar (only if TP set) */}
       {tpProgress !== null && (
         <div className="mt-3">
@@ -202,6 +271,47 @@ function Stat({
       </div>
       <div className="text-text-t1 mt-0.5 font-mono tabular-nums">{value}</div>
       {sub && <div className="text-text-t4 font-mono text-2xs">{sub}</div>}
+    </div>
+  );
+}
+
+/**
+ * Trail stop'un güncel fiyata olan mesafesini görselleştirir.
+ * Bar doluluk oranı: stop ne kadar yakınsa bar o kadar dolu (kırmızı).
+ * Referans: entry → stop aralığının %100'ü = tam dolu = stop tetiklendi.
+ */
+function TrailDistanceBar({
+  stopPx,
+  currentPx,
+  entryPx,
+  isLong,
+}: {
+  stopPx: number;
+  currentPx: number;
+  entryPx: number;
+  isLong: boolean;
+}) {
+  // LONG: stop altında → mesafe = (current - stop) / (current - entry + stop_dist)
+  // Basit görsel: stop distance / entry_distance × 100 (0=uzak, 100=stop seviyesinde)
+  const totalRange = Math.abs(currentPx - entryPx) + Math.abs(currentPx - stopPx);
+  if (totalRange <= 0) return null;
+  const stopDist = isLong ? currentPx - stopPx : stopPx - currentPx;
+  const fillPct = Math.max(0, Math.min(100, (1 - stopDist / totalRange) * 100));
+  const barColor =
+    fillPct > 75
+      ? "bg-signal-red"
+      : fillPct > 50
+      ? "bg-warning"
+      : "bg-signal-green";
+
+  return (
+    <div className="mt-2">
+      <div className="bg-border h-1 overflow-hidden rounded">
+        <div
+          className={`h-full transition-all ${barColor}`}
+          style={{ width: `${fillPct}%` }}
+        />
+      </div>
     </div>
   );
 }
