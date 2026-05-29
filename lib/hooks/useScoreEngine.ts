@@ -105,7 +105,10 @@ export function useScoreEngine(): void {
     candleStore.candles,
     marketStore.prices,
     macroStore.fgValue,
+    macroStore.fundingBtc,
+    macroStore.fundingEth,
     riskStore.btcCooldownUntil,
     accountStore.drawdownProtocol,
+    tradesStore.trades,
   ]);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useMacroStore } from "@/lib/store/macroStore";
 import { useCandleStore } from "@/lib/store/candleStore";
 import { MarketSummaryBanner } from "@/components/piyasa/MarketSummaryBanner";
@@ -35,10 +35,6 @@ export default function PiyasaPage() {
         : null,
     [eth1h, eth4h, eth1d],
   );
-
-  useEffect(() => {
-    store.refreshAll();
-  }, []);
 
   return (
     <div className="flex flex-col gap-4 p-4">
