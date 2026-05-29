@@ -132,6 +132,17 @@ export default function KararPage() {
         },
       );
 
+      // Disiplin logu — her durumda kayıt
+      const je = output.journalEntry;
+      riskStore.logEvent(je.type as Parameters<typeof riskStore.logEvent>[0], {
+        pair: je.pair,
+        direction: je.direction,
+        score: je.score,
+        decision: je.decision,
+        source: je.source,
+        reason: je.reason,
+      });
+
       if (output.ok) {
         tradesStore.openPending({
           pair: activePair,

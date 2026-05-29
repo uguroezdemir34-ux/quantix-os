@@ -30,6 +30,7 @@ import { useCandlePoller } from "@/lib/hooks/useCandlePoller";
 import { usePositionPoller } from "@/lib/hooks/usePositionPoller";
 import { useScoreEngine } from "@/lib/hooks/useScoreEngine";
 import { useTrailingManager } from "@/lib/hooks/useTrailingManager";
+import { useBalancePoller } from "@/lib/hooks/useBalancePoller";
 
 export function AppShell({
   children,
@@ -48,6 +49,8 @@ export function AppShell({
   useScoreEngine();
   // Trailing stop manager (30s tick, demoMode değişiminde yeniden başlar)
   useTrailingManager();
+  // Balance poller (60s)
+  useBalancePoller();
 
   useEffect(() => {
     rehydrate();
