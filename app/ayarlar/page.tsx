@@ -1,0 +1,15 @@
+import { OkxCredsCard } from "@/components/ayarlar/OkxCredsCard";
+import { TelegramTestCard } from "@/components/ayarlar/TelegramTestCard";
+import { TradingLimitsCard } from "@/components/ayarlar/TradingLimitsCard";
+import { DrawdownToggleCard } from "@/components/ayarlar/DrawdownToggleCard";
+
+export default function AyarlarPage() {
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <OkxCredsCard />
+      <TelegramTestCard />
+      <TradingLimitsCard />
+      <DrawdownToggleCard />
+    </div>
+  );
+}
