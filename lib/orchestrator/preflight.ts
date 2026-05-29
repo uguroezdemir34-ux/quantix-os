@@ -17,6 +17,8 @@ import type {
 } from "./types";
 import type { Pair } from "@/lib/constants/pairs";
 import { checkDataHealth } from "./circuit-breaker";
+import { computeEquityCurveDecision } from "@/lib/risk/equity-curve";
+import { checkCorrelationLimit } from "@/lib/risk/correlation";
 
 export interface PreflightCheckResult {
   passed: boolean;
@@ -41,6 +43,22 @@ export function runPreflightChecks(
         passed: false,
         decision: "blocked_data_frozen",
         reasonHuman: health.reason ?? "Price data unavailable",
+      };
+    }
+  }
+
+  // 0b. Equity curve (haftalık/aylık drawdown) — günlük drawdown check'inden önce
+  if (input.accountState.equityCurve !== undefined) {
+    const eq = computeEquityCurveDecision({
+      dailyPnlPct: 0, // günlük zaten ayrı kontrol ediliyor (#2)
+      weeklyPnlPct: input.accountState.equityCurve.weeklyPnlPct,
+      monthlyPnlPct: input.accountState.equityCurve.monthlyPnlPct,
+    });
+    if (eq.tier === "locked" && eq.triggeredBy !== "daily") {
+      return {
+        passed: false,
+        decision: "blocked_equity_curve",
+        reasonHuman: eq.reason,
       };
     }
   }
@@ -76,6 +94,26 @@ export function runPreflightChecks(
       decision: "blocked_daily_limit",
       reasonHuman: `Daily trade limit reached (${input.accountState.todayTradeCount}/${input.accountState.maxTradesPerDay})`,
     };
+  }
+
+  // 5. Korelasyon limiti — aynı yönde çok fazla açık pozisyon
+  if (input.accountState.openPositions !== undefined) {
+    const direction = input.signal.direction;
+    if (direction === "LONG" || direction === "SHORT") {
+      const corrCheck = checkCorrelationLimit(
+        input.pair,
+        direction,
+        input.accountState.openPositions,
+        input.accountState.correlationConfig,
+      );
+      if (corrCheck.blocked) {
+        return {
+          passed: false,
+          decision: "blocked_correlation",
+          reasonHuman: corrCheck.reason ?? "Correlation limit exceeded",
+        };
+      }
+    }
   }
 
   return {

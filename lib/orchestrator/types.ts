@@ -66,6 +66,24 @@ export interface AccountStateSnapshot {
     /** Son tick alınan zaman (epoch ms) */
     lastTickAt: number;
   };
+  /**
+   * Equity curve kontrolü — haftalık/aylık drawdown.
+   * undefined ise kontrol atlanır.
+   */
+  equityCurve?: {
+    weeklyPnlPct: number;
+    monthlyPnlPct: number;
+  };
+  /**
+   * Korelasyon limiti için açık pozisyon özeti.
+   * undefined ise korelasyon kontrolü atlanır.
+   */
+  openPositions?: readonly import("@/lib/risk/correlation").OpenPositionSummary[];
+  /**
+   * Korelasyon limiti konfigürasyonu.
+   * undefined ise default (maxSameDirection=1) kullanılır.
+   */
+  correlationConfig?: import("@/lib/risk/correlation").CorrelationLimitConfig;
 }
 
 // ═══════════════ DECISION ═══════════════
@@ -84,6 +102,8 @@ export type OrchestratorDecision =
   | "blocked_daily_limit" // todayTradeCount >= maxTradesPerDay
   | "blocked_dedup" // son 30sn'de aynı sinyal var
   | "blocked_data_frozen" // fiyat verisi 15s+ donmuş / WS + REST her ikisi de sağlıksız
+  | "blocked_equity_curve" // haftalık/aylık drawdown eşiği aşıldı
+  | "blocked_correlation" // aynı yönde çok fazla açık pozisyon var
   // Başarısız
   | "failed_exchange"; // adapter.openPosition başarısız
 

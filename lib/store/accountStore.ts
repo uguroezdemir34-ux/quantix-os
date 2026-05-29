@@ -10,6 +10,11 @@
 import { create } from "zustand";
 import { loadFromStorage, saveToStorage } from "./persist";
 import { z } from "zod";
+import {
+  needsDailyReset,
+  needsWeeklyReset,
+  needsMonthlyReset,
+} from "@/lib/risk/equity-curve";
 
 export type DrawdownTier = "normal" | "caution" | "restricted" | "locked";
 
@@ -26,6 +31,16 @@ interface AccountStoreState {
   balanceFree: number;
   /** Günlük P&L yüzdesi */
   dailyPnlPct: number;
+  /** Haftalık kümülatif P&L yüzdesi */
+  weeklyPnlPct: number;
+  /** Aylık kümülatif P&L yüzdesi */
+  monthlyPnlPct: number;
+  /** Son günlük reset zamanı (epoch ms) */
+  lastDailyResetAt: number;
+  /** Son haftalık reset zamanı (epoch ms) */
+  lastWeeklyResetAt: number;
+  /** Son aylık reset zamanı (epoch ms) */
+  lastMonthlyResetAt: number;
   /** Drawdown protocol (dailyPnlPct'den hesaplanır) */
   drawdownProtocol: DrawdownProtocol;
   /** Hidrate edildi mi (SSR guard) */
@@ -34,6 +49,13 @@ interface AccountStoreState {
   // Actions
   setBalance: (total: number, free: number) => void;
   setDailyPnlPct: (pct: number) => void;
+  setWeeklyPnlPct: (pct: number) => void;
+  setMonthlyPnlPct: (pct: number) => void;
+  /**
+   * Periyodik reset kontrolü — her tick veya strateji döngüsünde çağrılabilir.
+   * Gerekli periyotları sıfırlar (gün/hafta/ay geçmişse).
+   */
+  checkAndResetPeriods: (now?: number) => void;
   rehydrate: () => void;
 }
 
@@ -44,6 +66,11 @@ const accountSchema = z.object({
   balanceTotal: z.number(),
   balanceFree: z.number(),
   dailyPnlPct: z.number(),
+  weeklyPnlPct: z.number().optional(),
+  monthlyPnlPct: z.number().optional(),
+  lastDailyResetAt: z.number().optional(),
+  lastWeeklyResetAt: z.number().optional(),
+  lastMonthlyResetAt: z.number().optional(),
 });
 
 type PersistedAccount = z.infer<typeof accountSchema>;
@@ -72,32 +99,66 @@ export function computeDrawdownProtocol(dailyPnlPct: number): DrawdownProtocol {
 const DEFAULT_BALANCE_TOTAL = 80; // Uğur'un başlangıç sermayesi
 const DEFAULT_BALANCE_FREE = 80;
 
-export const useAccountStore = create<AccountStoreState>((set) => ({
+export const useAccountStore = create<AccountStoreState>((set, get) => ({
   balanceTotal: DEFAULT_BALANCE_TOTAL,
   balanceFree: DEFAULT_BALANCE_FREE,
   dailyPnlPct: 0,
+  weeklyPnlPct: 0,
+  monthlyPnlPct: 0,
+  lastDailyResetAt: 0,
+  lastWeeklyResetAt: 0,
+  lastMonthlyResetAt: 0,
   drawdownProtocol: computeDrawdownProtocol(0),
   _hydrated: false,
 
   setBalance: (total, free) => {
     set({ balanceTotal: total, balanceFree: free });
-    const state = useAccountStore.getState();
-    saveToStorage<PersistedAccount>(STORAGE_KEY, {
-      balanceTotal: total,
-      balanceFree: free,
-      dailyPnlPct: state.dailyPnlPct,
-    });
+    const state = get();
+    saveToStorage<PersistedAccount>(STORAGE_KEY, buildPersisted(state, { balanceTotal: total, balanceFree: free }));
   },
 
   setDailyPnlPct: (pct) => {
     const protocol = computeDrawdownProtocol(pct);
     set({ dailyPnlPct: pct, drawdownProtocol: protocol });
-    const state = useAccountStore.getState();
-    saveToStorage<PersistedAccount>(STORAGE_KEY, {
-      balanceTotal: state.balanceTotal,
-      balanceFree: state.balanceFree,
-      dailyPnlPct: pct,
-    });
+    const state = get();
+    saveToStorage<PersistedAccount>(STORAGE_KEY, buildPersisted(state, { dailyPnlPct: pct }));
+  },
+
+  setWeeklyPnlPct: (pct) => {
+    set({ weeklyPnlPct: pct });
+    const state = get();
+    saveToStorage<PersistedAccount>(STORAGE_KEY, buildPersisted(state, { weeklyPnlPct: pct }));
+  },
+
+  setMonthlyPnlPct: (pct) => {
+    set({ monthlyPnlPct: pct });
+    const state = get();
+    saveToStorage<PersistedAccount>(STORAGE_KEY, buildPersisted(state, { monthlyPnlPct: pct }));
+  },
+
+  checkAndResetPeriods: (now = Date.now()) => {
+    const state = get();
+    const updates: Partial<AccountStoreState> = {};
+
+    if (needsDailyReset(state.lastDailyResetAt, now)) {
+      updates.dailyPnlPct = 0;
+      updates.drawdownProtocol = computeDrawdownProtocol(0);
+      updates.lastDailyResetAt = now;
+    }
+    if (needsWeeklyReset(state.lastWeeklyResetAt, now)) {
+      updates.weeklyPnlPct = 0;
+      updates.lastWeeklyResetAt = now;
+    }
+    if (needsMonthlyReset(state.lastMonthlyResetAt, now)) {
+      updates.monthlyPnlPct = 0;
+      updates.lastMonthlyResetAt = now;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      set(updates);
+      const newState = { ...state, ...updates };
+      saveToStorage<PersistedAccount>(STORAGE_KEY, buildPersisted(newState, {}));
+    }
   },
 
   rehydrate: () => {
@@ -115,8 +176,30 @@ export const useAccountStore = create<AccountStoreState>((set) => ({
       balanceTotal: persisted.balanceTotal,
       balanceFree: persisted.balanceFree,
       dailyPnlPct: persisted.dailyPnlPct,
+      weeklyPnlPct: persisted.weeklyPnlPct ?? 0,
+      monthlyPnlPct: persisted.monthlyPnlPct ?? 0,
+      lastDailyResetAt: persisted.lastDailyResetAt ?? 0,
+      lastWeeklyResetAt: persisted.lastWeeklyResetAt ?? 0,
+      lastMonthlyResetAt: persisted.lastMonthlyResetAt ?? 0,
       drawdownProtocol: computeDrawdownProtocol(persisted.dailyPnlPct),
       _hydrated: true,
     });
   },
 }));
+
+function buildPersisted(
+  state: AccountStoreState,
+  overrides: Partial<PersistedAccount>,
+): PersistedAccount {
+  return {
+    balanceTotal: state.balanceTotal,
+    balanceFree: state.balanceFree,
+    dailyPnlPct: state.dailyPnlPct,
+    weeklyPnlPct: state.weeklyPnlPct,
+    monthlyPnlPct: state.monthlyPnlPct,
+    lastDailyResetAt: state.lastDailyResetAt,
+    lastWeeklyResetAt: state.lastWeeklyResetAt,
+    lastMonthlyResetAt: state.lastMonthlyResetAt,
+    ...overrides,
+  };
+}
