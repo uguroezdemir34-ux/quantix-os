@@ -13,7 +13,7 @@
  * Hover'da gün detayı (trade count + total pnl).
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useT } from "@/lib/i18n/context";
 import type { DailyAggregate } from "@/lib/pnl/types";
 
@@ -23,12 +23,21 @@ interface Props {
   maxAbsPnl?: number;
 }
 
+type Lookback = 30 | 7;
+
 export function PnlCalendar({
   aggregates,
   maxAbsPnl,
 }: Props): React.ReactElement {
   const t = useT();
   const [hovered, setHovered] = useState<DailyAggregate | null>(null);
+  const [lookback, setLookback] = useState<Lookback>(30);
+
+  // Lookback filtresi — son N gün
+  const visible = useMemo(() => {
+    if (lookback === 30) return aggregates;
+    return aggregates.slice(-7);
+  }, [aggregates, lookback]);
 
   // Renk yoğunluğu için referans değer
   const refMax =
@@ -44,14 +53,27 @@ export function PnlCalendar({
         <h3 className="text-text-t1 font-mono text-xs tracking-widest">
           {t("pnl.calendar.title")}
         </h3>
-        <span className="text-text-t3 font-mono text-2xs tracking-wider">
-          {aggregates.length} {aggregates.length === 1 ? "day" : "days"}
-        </span>
+        <div className="flex gap-1">
+          {([30, 7] as Lookback[]).map((lb) => (
+            <button
+              key={lb}
+              type="button"
+              onClick={() => setLookback(lb)}
+              className={`rounded border px-2 py-0.5 font-mono text-2xs tracking-wider transition-colors ${
+                lookback === lb
+                  ? "border-text-t2 text-text-t1 bg-surface-s2"
+                  : "border-border text-text-t3"
+              }`}
+            >
+              {lb === 30 ? t("pnl.calendar.lookback30d") : t("pnl.calendar.lookback7d")}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid: 7 kolon (haftalık), N satır */}
       <div className="grid grid-cols-7 gap-1.5">
-        {aggregates.map((a) => (
+        {visible.map((a) => (
           <DayCell
             key={a.date}
             agg={a}

@@ -5,7 +5,7 @@ import { PnlStatsCard } from "@/components/pnl/PnlStatsCard";
 import { PnlSummaryRow } from "@/components/pnl/PnlSummaryRow";
 import { PnlCalendar } from "@/components/pnl/PnlCalendar";
 import { computePnlStats } from "@/lib/pnl/stats";
-import { computeDailyAggregates } from "@/lib/pnl/compute";
+import { computeDailyAggregates, fillMissingDays } from "@/lib/pnl/compute";
 import type { TradeRecord } from "@/lib/pnl/types";
 
 export default function PnlPage() {
@@ -27,16 +27,19 @@ export default function PnlPage() {
 
   const stats = computePnlStats(trades);
   const aggregates = computeDailyAggregates(trades);
-  const maxAbsPnl = aggregates.reduce(
+
+  // 30 tam gün — boş günler dahil (takvim görünümü için)
+  const calendarAggregates = fillMissingDays(aggregates, Date.now(), 30);
+  const maxAbsPnl = calendarAggregates.reduce(
     (m, d) => Math.max(m, Math.abs(d.totalPnlUsd)),
-    0
+    1, // 0'a bölme koruması
   );
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <PnlSummaryRow trades={trades} />
       <PnlStatsCard stats={stats} />
-      <PnlCalendar aggregates={aggregates} maxAbsPnl={maxAbsPnl} />
+      <PnlCalendar aggregates={calendarAggregates} maxAbsPnl={maxAbsPnl} />
     </div>
   );
 }
