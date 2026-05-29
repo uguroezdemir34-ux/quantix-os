@@ -14,6 +14,16 @@ export interface OpenPositionInput {
   tp1Price?: number;
   /** TP2 trigger fiyatı — opsiyonel */
   tp2Price?: number;
+  /**
+   * Slippage guard tarafından belirlenen emir tipi.
+   * Varsayılan: "market" (geriye dönük uyumlu).
+   */
+  ordType?: "market" | "limit" | "post_only";
+  /**
+   * Limit / Post-Only emirler için fiyat.
+   * ordType="market" ise ignored.
+   */
+  limitPx?: number;
 }
 
 export interface ClosePositionInput {

@@ -30,7 +30,7 @@ import {
   createOkxTradeLimiter,
   createOkxAlgoLimiter,
 } from "./rate-limiter";
-import { IdempotencyGuard, generateClientOrderId } from "./idempotency";
+import { IdempotencyGuard } from "./idempotency";
 
 // ─── Sabitler ────────────────────────────────────────────────
 
@@ -245,19 +245,30 @@ export class OkxAdapter implements ExchangeAdapter {
     // ─── Market order ───
     let orderId = "";
     try {
+      const resolvedOrdType = input.ordType ?? "market";
+      const orderBody: Record<string, unknown> = {
+        instId,
+        tdMode: input.marginMode,
+        side,
+        posSide,
+        ordType: resolvedOrdType,
+        sz: String(input.qty),
+        lever: String(input.leverage),
+        clOrdId,
+      };
+      // Limit / Post-Only: fiyat zorunlu
+      if (resolvedOrdType !== "market" && input.limitPx && input.limitPx > 0) {
+        orderBody.px = String(input.limitPx);
+      } else if (resolvedOrdType !== "market") {
+        // Fiyat verilmediyse market'a düş
+        orderBody.ordType = "market";
+        delete orderBody.px;
+      }
+
       const orderResult = await withNetworkRetry(() =>
         proxyPost(
           "/api/v5/trade/order",
-          {
-            instId,
-            tdMode: input.marginMode,
-            side,
-            posSide,
-            ordType: "market",
-            sz: String(input.qty),
-            lever: String(input.leverage),
-            clOrdId,
-          },
+          orderBody,
           this.isDemo,
           this.timeoutMs,
           this.fetchFn,
