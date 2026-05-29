@@ -29,6 +29,7 @@ import { useMarketStream } from "@/lib/ws/useMarketStream";
 import { useCandlePoller } from "@/lib/hooks/useCandlePoller";
 import { usePositionPoller } from "@/lib/hooks/usePositionPoller";
 import { useScoreEngine } from "@/lib/hooks/useScoreEngine";
+import { useTrailingManager } from "@/lib/hooks/useTrailingManager";
 
 export function AppShell({
   children,
@@ -45,6 +46,8 @@ export function AppShell({
   usePositionPoller();
   // Score engine (candle değişince tetiklenir)
   useScoreEngine();
+  // Trailing stop manager (30s tick, demoMode değişiminde yeniden başlar)
+  useTrailingManager();
 
   useEffect(() => {
     rehydrate();
