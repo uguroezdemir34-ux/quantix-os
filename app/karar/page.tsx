@@ -22,6 +22,7 @@ import { TradeConfirmModal } from "@/components/karar/TradeConfirmModal";
 import { computePositionSize } from "@/lib/sizer/position";
 import { atr } from "@/lib/indicators/atr";
 import { toIndicatorCandle } from "@/lib/okx/candles";
+import { findSwingLevels } from "@/lib/sr/swing";
 import { orchestrate } from "@/lib/orchestrator/router";
 import { getOkxAdapter } from "@/lib/exchange/okx-adapter";
 import { createChannel } from "@/lib/notify/registry";
@@ -37,6 +38,7 @@ export default function KararPage() {
   const result = useScoreStore((s) => s.results[activePair]);
   const computing = useScoreStore((s) => s.computing);
   const candles1h = useCandleStore((s) => s.candles[`${activePair}_1h`] ?? []);
+  const candles4h = useCandleStore((s) => s.candles[`${activePair}_4h`] ?? []);
   const livePrice = useMarketStore((s) => s.prices[activePair]?.last ?? null);
   const accountStore = useAccountStore();
   const settings = useSettingsStore();
@@ -48,6 +50,24 @@ export default function KararPage() {
     if (candles1h.length < 15) return null;
     return atr(candles1h.map(toIndicatorCandle), { period: 14 });
   }, [candles1h]);
+
+  // Swing seviyeleri — yapısal stop için
+  // 4h öncelikli (daha anlamlı yapı), 1h fallback
+  const swingLevels = useMemo(() => {
+    const sw4h =
+      candles4h.length >= 10
+        ? findSwingLevels(candles4h.map(toIndicatorCandle), 20, 2)
+        : { swingLow: null, swingHigh: null };
+    const sw1h =
+      candles1h.length >= 10
+        ? findSwingLevels(candles1h.map(toIndicatorCandle), 30, 2)
+        : { swingLow: null, swingHigh: null };
+    // 4h varsa kullan, yoksa 1h'a düş
+    return {
+      swingLow: sw4h.swingLow ?? sw1h.swingLow,
+      swingHigh: sw4h.swingHigh ?? sw1h.swingHigh,
+    };
+  }, [candles1h, candles4h]);
 
   const sizerResult = useMemo<PositionSizerResult | null>(() => {
     if (!result || result.verdict !== "go") return null;
@@ -61,8 +81,8 @@ export default function KararPage() {
       px: livePrice,
       atr: atrValue,
       adx1h: null,
-      swingLow: null,
-      swingHigh: null,
+      swingLow: swingLevels.swingLow,
+      swingHigh: swingLevels.swingHigh,
       balance: {
         total: accountStore.balanceTotal,
         free: accountStore.balanceFree,
@@ -83,7 +103,7 @@ export default function KararPage() {
       },
       score: result.score,
     });
-  }, [result, livePrice, atrValue, activePair, accountStore]);
+  }, [result, livePrice, atrValue, swingLevels, activePair, accountStore]);  // eslint-disable-line
 
   async function handleConfirm() {
     if (!sizerResult || !result || !livePrice) return;
