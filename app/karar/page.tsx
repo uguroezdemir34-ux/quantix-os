@@ -30,6 +30,7 @@ import { createChannel } from "@/lib/notify/registry";
 import { getGlobalDedupeStore } from "@/lib/orchestrator/dedupe";
 import type { PositionSizerResult } from "@/lib/sizer/types";
 import { useFlowIntelligence } from "@/lib/hooks/useFlowIntelligence";
+import { getBucketStats } from "@/lib/bucket/stats";
 
 export default function KararPage() {
   const [activePair, setActivePair] = useState<Pair>("BTC");
@@ -47,6 +48,15 @@ export default function KararPage() {
   const riskStore = useRiskStore();
   const tradesStore = useTradesStore();
   const macroStore = useMacroStore();
+
+  // Bucket istatistikleri — geçmiş trade'lerden score bazlı performans
+  const bucketStats = useMemo(() => {
+    if (!result) return null;
+    const closedTrades = tradesStore.trades
+      .filter((t) => t.status === "closed" && t.exit != null && t.pair === activePair)
+      .map((t) => ({ score: t.entryContext.score, pnlUsd: t.exit!.pnlUsd }));
+    return getBucketStats(result.score, closedTrades);
+  }, [result, tradesStore.trades, activePair]);
 
   // Signal direction for flow intelligence (uppercase: "LONG" | "SHORT")
   const signalDir: "LONG" | "SHORT" =
@@ -106,7 +116,7 @@ export default function KararPage() {
         multiplier: protocol.multiplier,
         label: protocol.label,
       },
-      bucket: {
+      bucket: bucketStats ?? {
         n: 0,
         wr: null,
         isCut: false,
