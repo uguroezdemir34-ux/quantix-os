@@ -15,7 +15,26 @@ import type { Pair } from "@/lib/constants/pairs";
 
 export type TradeStatus = "pending" | "open" | "closed";
 
-export type ExitReason = "tp1" | "tp2" | "sl" | "manual" | "trail";
+export type ExitReason =
+  | "tp1"
+  | "tp2"
+  | "sl"
+  | "manual"
+  | "trail"
+  | "equity_halt"; // Equity curve circuit breaker tarafından zorla kapatıldı
+
+/** Equity halt türü — hangi circuit breaker tetiklendi */
+export type EquityHaltReason = "weekly_locked" | "monthly_locked";
+
+/** Equity halt durumu — state machine guard için */
+export interface EquityHaltState {
+  active: boolean;
+  reason: EquityHaltReason | null;
+  /** Halt başlangıç zamanı */
+  triggeredAt: number | null;
+  /** İnsanca açıklama */
+  label: string;
+}
 
 // ═══════════════ ENTRY CONTEXT ═══════════════
 

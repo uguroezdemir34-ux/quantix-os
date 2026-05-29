@@ -16,8 +16,14 @@ import type {
   ExitInfo,
   CloseTradeInput,
   OpenTradeInput,
+  EquityHaltState,
+  EquityHaltReason,
 } from "./types";
 import { buildTradeId } from "./types";
+import {
+  computeEquityCurveDecision,
+  type EquityCurveInput,
+} from "@/lib/risk/equity-curve";
 
 // ═══════════════ TRANSITIONS ═══════════════
 
@@ -125,6 +131,81 @@ export function computeExit(
     holdingSec,
     rMultiple,
   };
+}
+
+// ═══════════════ EQUITY HALT — STATE MACHINE GUARD ═══════════════
+
+/**
+ * Equity curve durumundan halt state hesapla.
+ *
+ * Split-Brain koruması: bu fonksiyon her state machine geçişinden önce
+ * çağrılabilir. Halt aktifse yeni geçişler reddedilir.
+ */
+export function computeEquityHaltState(
+  curve: EquityCurveInput,
+): EquityHaltState {
+  const decision = computeEquityCurveDecision(curve);
+
+  if (decision.tier !== "locked") {
+    return { active: false, reason: null, triggeredAt: null, label: "Normal" };
+  }
+
+  const reason: EquityHaltReason =
+    decision.triggeredBy === "monthly" ? "monthly_locked" : "weekly_locked";
+
+  return {
+    active: true,
+    reason,
+    triggeredAt: Date.now(),
+    label: decision.label,
+  };
+}
+
+/**
+ * Split-Brain Guard — Equity halt aktifken yeni pending→open geçişini engelle.
+ *
+ * Senaryo: trade pending durumda iken haftalık/aylık kilit devreye girdiyse,
+ * confirmOpen çağrısını reddet. Bu "split-brain" durumunu önler:
+ * borsada emir gönderilmiş ama sistem kilit durumunda → state machine hata verir,
+ * caller rollback yapmalı.
+ *
+ * @throws Error eğer equity halt aktifse
+ */
+export function guardAgainstEquityHalt(
+  trade: TradeSnapshot,
+  haltState: EquityHaltState,
+): void {
+  if (!haltState.active) return;
+  throw new Error(
+    `guardAgainstEquityHalt: equity halt active (${haltState.reason}) — ` +
+      `cannot transition trade ${trade.id} (${trade.status}). ` +
+      `Caller must cancel/rollback the order.`,
+  );
+}
+
+/**
+ * Equity halt tetiklendiğinde tüm açık/bekleyen trade'leri zorla kapat.
+ *
+ * Her trade için mevcut fiyatı exit price olarak kullanır (gerçek P&L hesabı
+ * için caller livePrice geçirir). reason = "equity_halt".
+ *
+ * Immutability: closed trade'ler dokunulmaz geçer.
+ *
+ * @param trades     Mevcut trade listesi
+ * @param livePrice  Anlık fiyat (pair bazlı; caller pair kontrolü yapar)
+ * @param now        Zaman (test injection için)
+ * @returns          Güncellenmiş trade listesi (yeni nesneler, orijinal değişmez)
+ */
+export function forceCloseAllForEquityHalt(
+  trades: readonly TradeSnapshot[],
+  livePrice: number,
+  now: number = Date.now(),
+): TradeSnapshot[] {
+  return trades.map((trade) => {
+    if (trade.status === "closed") return trade;
+    const exit = computeExit(trade, livePrice, "equity_halt", now);
+    return { ...trade, status: "closed", exit };
+  });
 }
 
 // ═══════════════ TP/SL HIT DETECTION ═══════════════

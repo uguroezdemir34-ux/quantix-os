@@ -4,9 +4,9 @@
  * Günlük drawdown-protocol.ts zaten -1.5% / -2.5% / -3% eşiklerini işler.
  * Bu modül üstüne haftalık ve aylık kümülatif eşikler ekler:
  *
- *   Haftalık -5%  → Restricted (¼ risk) — haftanın geri kalanı
- *   Haftalık -7%  → Locked — haftanın geri kalanı
- *   Aylık   -10%  → Locked — ayın geri kalanı
+ *   Haftalık  -5.0% → Restricted (¼ risk) — haftanın geri kalanı
+ *   Haftalık  -7.5% → Locked (Full Halt) — haftanın geri kalanı
+ *   Aylık    -12.0% → Monthly Locked — ayın geri kalanı (Siber Kilit)
  *
  * Öncelik: aylık > haftalık > günlük (en kısıtlayıcı tier kazanır).
  *
@@ -39,9 +39,9 @@ export interface EquityCurveDecision {
 export const EQUITY_THRESHOLDS = {
   // Haftalık
   WEEKLY_RESTRICTED: -5.0,
-  WEEKLY_LOCKED: -7.0,
-  // Aylık
-  MONTHLY_LOCKED: -10.0,
+  WEEKLY_LOCKED: -7.5,
+  // Aylık Siber Kilit
+  MONTHLY_LOCKED: -12.0,
 } as const;
 
 // ─── Saf Fonksiyonlar ────────────────────────────────────────
@@ -61,8 +61,8 @@ export function weeklyEquityTier(
       tier: "locked",
       multiplier: 0,
       minScore: 100,
-      label: "🔒 Haftalık Kilit",
-      reason: `Haftalık kayıp %${weeklyPnlPct.toFixed(2)} — haftalık kilit`,
+      label: "🔒 Haftalık Full Halt",
+      reason: `Haftalık kayıp %${weeklyPnlPct.toFixed(2)} — haftalık tam kilit (≤-7.5%)`,
     };
   }
 
@@ -71,7 +71,7 @@ export function weeklyEquityTier(
     multiplier: 0.25,
     minScore: 85,
     label: "🟠 Haftalık Kısıtlı",
-    reason: `Haftalık kayıp %${weeklyPnlPct.toFixed(2)} — risk ¼`,
+    reason: `Haftalık kayıp %${weeklyPnlPct.toFixed(2)} — risk ¼ (≤-5%)`,
   };
 }
 
@@ -89,8 +89,8 @@ export function monthlyEquityTier(
     tier: "locked",
     multiplier: 0,
     minScore: 100,
-    label: "🔒 Aylık Kilit",
-    reason: `Aylık kayıp %${monthlyPnlPct.toFixed(2)} — aylık kilit`,
+    label: "🔒 Aylık Siber Kilit",
+    reason: `Aylık kayıp %${monthlyPnlPct.toFixed(2)} — aylık siber kilit (≤-12%)`,
   };
 }
 
