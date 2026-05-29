@@ -9,7 +9,7 @@ import type {
 } from "@/lib/orchestrator/types";
 import type { ScoreResult } from "@/lib/score/orchestrator";
 import type { AdapterResult, TradeData } from "@/lib/exchange/types";
-import type { NotifyResult } from "@/lib/notify/types";
+
 
 // ─── Factories ───
 

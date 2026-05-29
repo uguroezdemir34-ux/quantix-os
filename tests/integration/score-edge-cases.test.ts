@@ -43,7 +43,7 @@ function makeScoreInput(overrides?: Partial<ScoreInput>): ScoreInput {
     volumes1h: Array(15).fill(1000),
     now: 1_700_000_000_000,
     last4hMovePct: 0.5,
-    vwap: { vwap: 49900, upper: 51000, lower: 48800 },
+    vwap: { vwap: 49900, stddev: 550 },
     ...overrides,
   };
 }
@@ -111,7 +111,7 @@ describe("computeScore() edge cases", () => {
         fundingRate: 0.0001,
         atrPercentile: 55,
         adx4h: 32,
-        vwap: { vwap: 49800, upper: 51500, lower: 48000 },
+        vwap: { vwap: 49800, stddev: 550 },
         fg: 55,
         last4hMovePct: 0.6,
       }),
