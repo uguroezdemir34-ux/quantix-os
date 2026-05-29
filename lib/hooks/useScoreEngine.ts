@@ -42,6 +42,9 @@ export function useScoreEngine(): void {
 
       const livePrice = marketStore.prices[pair]?.last ?? null;
       const fg = macroStore.fgValue ?? 50;
+      const fundingResult =
+        pair === "BTC" ? macroStore.fundingBtc : macroStore.fundingEth;
+      const fundingRate = fundingResult?.fundingRate ?? null;
 
       const openPositions = positionStore.positions.map((p) => ({
         pair: p.pair,
@@ -86,6 +89,7 @@ export function useScoreEngine(): void {
         openPositions,
         drawdownProtocol,
         trades,
+        fundingRate,
         srModifier: 0,
         sweep15m: { type: null, strength: 0 },
         timeQuality: { quality: 1, reason: "" },

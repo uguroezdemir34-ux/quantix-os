@@ -51,6 +51,8 @@ export interface ComposeInput {
   timeQuality: ScoreInput["timeQuality"];
   /** Şu an (epoch ms) */
   now: number;
+  /** Funding rate (macroStore'dan, opsiyonel) */
+  fundingRate?: number | null;
 }
 
 /**
@@ -153,7 +155,7 @@ export function composeScoreInput(input: ComposeInput): ScoreInput | null {
     bbPct,
     vwap: vwapVal ?? null,
     volRatio,
-    fundingRate: null, // şimdilik (paket #5+: REST funding fetch)
+    fundingRate: input.fundingRate ?? null,
     atrPercentile: atrPctRes?.percentile ?? null,
     adx4h: adx4h?.adx ?? null,
     ema21_1h,
