@@ -2,6 +2,9 @@
   "name": "ugur-trade-panel",
   "version": "2.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Uğur Trader Panel v2 — v55.51 panelinin Next.js mimarisine taşınmış hali. BTC + ETH futures, disiplinli kural tabanlı sinyal motoru.",
   "scripts": {
     "dev": "next dev",
