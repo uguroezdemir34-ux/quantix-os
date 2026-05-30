@@ -158,33 +158,21 @@ export async function handleOkxProxy(
 
 /**
  * Production'da env'den config yükle.
- * .env.local'da `OKX_API_KEY`, `OKX_API_SECRET`, `OKX_API_PASSPHRASE` + demo versiyonu.
+ * lib/config/env.ts üzerinden beslenir — fail-safe uyarılar oradan gelir.
  *
  * Eksik creds → null döner (proxy çağrıldığında NO_KEYS hatası verir,
  * çökme yok — bu davranış panel ile uyumlu).
  */
-export function loadServerConfigFromEnv(env: NodeJS.ProcessEnv): OkxServerConfig {
-  const prodOk =
-    !!env.OKX_API_KEY && !!env.OKX_API_SECRET && !!env.OKX_API_PASSPHRASE;
-  const demoOk =
-    !!env.OKX_DEMO_API_KEY &&
-    !!env.OKX_DEMO_API_SECRET &&
-    !!env.OKX_DEMO_API_PASSPHRASE;
-
+export function loadServerConfigFromEnv(env: Record<string, string | undefined>): OkxServerConfig {
+  // Merkezi env loader'ı kullan — eksikler için otomatik warn yazar
+  import("@/lib/config/env").then(() => undefined).catch(() => undefined); // side-effect: uyarılar
+  const prodOk = !!env.OKX_API_KEY && !!env.OKX_API_SECRET && !!env.OKX_API_PASSPHRASE;
+  const demoOk = !!env.OKX_DEMO_API_KEY && !!env.OKX_DEMO_API_SECRET && !!env.OKX_DEMO_API_PASSPHRASE;
+  if (!prodOk && !demoOk && typeof console !== "undefined") {
+    console.warn("[QUANTIX ENV] ⚠️  OKX credentials eksik — OKX_API_KEY / OKX_DEMO_API_KEY ayarlanmamış.");
+  }
   return {
-    prodCreds: prodOk
-      ? {
-          key: env.OKX_API_KEY!,
-          secret: env.OKX_API_SECRET!,
-          pass: env.OKX_API_PASSPHRASE!,
-        }
-      : null,
-    demoCreds: demoOk
-      ? {
-          key: env.OKX_DEMO_API_KEY!,
-          secret: env.OKX_DEMO_API_SECRET!,
-          pass: env.OKX_DEMO_API_PASSPHRASE!,
-        }
-      : null,
+    prodCreds: prodOk ? { key: env.OKX_API_KEY!, secret: env.OKX_API_SECRET!, pass: env.OKX_API_PASSPHRASE! } : null,
+    demoCreds: demoOk ? { key: env.OKX_DEMO_API_KEY!, secret: env.OKX_DEMO_API_SECRET!, pass: env.OKX_DEMO_API_PASSPHRASE! } : null,
   };
 }

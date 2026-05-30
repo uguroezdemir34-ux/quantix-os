@@ -105,17 +105,17 @@ export function PositionCard({
       </div>
 
       {/* UPL — big, primary signal */}
-      <div className="mb-4 flex items-baseline justify-between">
-        <div>
-          <div className={`font-mono text-2xl font-bold tabular-nums ${uplColor}`}>
+      <div className="mb-4 flex min-w-0 items-baseline justify-between gap-2">
+        <div className="min-w-0 shrink">
+          <div className={`overflow-hidden text-ellipsis whitespace-nowrap font-mono text-2xl font-bold tabular-nums ${uplColor}`}>
             {formatPercent(roe, locale, true)}
           </div>
           <div className="text-text-t3 font-mono text-2xs tracking-wider">
             ROE
           </div>
         </div>
-        <div className="text-right">
-          <div className={`font-mono text-base tabular-nums ${uplColor}`}>
+        <div className="min-w-0 shrink-0 text-right">
+          <div className={`overflow-hidden text-ellipsis whitespace-nowrap font-mono text-base tabular-nums ${uplColor}`}>
             {liveUpl >= 0 ? "+" : ""}
             {formatPrice(liveUpl, locale)}
           </div>
@@ -126,7 +126,7 @@ export function PositionCard({
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3 text-xs">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
         <Stat
           label={t("position.entry")}
           value={formatPrice(position.entryPx, locale)}
@@ -147,7 +147,7 @@ export function PositionCard({
       </div>
 
       {/* SL/TP row */}
-      <div className="border-border mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-xs">
+      <div className="border-border mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t pt-3 text-xs">
         <SlTpStat
           label={t("position.stopLoss")}
           value={position.slTriggerPx}
@@ -269,8 +269,8 @@ function Stat({
       <div className="text-text-t3 font-mono text-2xs tracking-wider">
         {label}
       </div>
-      <div className="text-text-t1 mt-0.5 font-mono tabular-nums">{value}</div>
-      {sub && <div className="text-text-t4 font-mono text-2xs">{sub}</div>}
+      <div className="text-text-t1 mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums">{value}</div>
+      {sub && <div className="text-text-t4 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-2xs">{sub}</div>}
     </div>
   );
 }

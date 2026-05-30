@@ -67,7 +67,7 @@ export function PositionSizer({
       </div>
 
       {/* Boyut + risk */}
-      <div className="border-border mt-3 grid grid-cols-2 gap-3 border-t pt-3">
+      <div className="border-border mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t pt-3 sm:grid-cols-4">
         <Stat
           label={t("sizer.size")}
           value={`${formatCoinAmount(result.qty, result.pair, locale)} ${result.pair}`}
@@ -176,16 +176,16 @@ function PriceRow({
   neutral?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
+    <div className="flex min-w-0 items-baseline justify-between gap-2">
       <span className="text-text-t3 w-12 shrink-0 font-mono text-2xs tracking-wider">
         {label}
       </span>
       <span
-        className={`font-mono text-sm tabular-nums ${neutral ? "text-text-t1" : color}`}
+        className={`shrink-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-sm tabular-nums ${neutral ? "text-text-t1" : color}`}
       >
         {value}
       </span>
-      <span className="text-text-t4 flex-1 truncate font-mono text-2xs">
+      <span className="text-text-t4 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-2xs">
         {pct && <span>{pct}</span>}
         {pct && sub && <span> · </span>}
         {sub && <span>{sub}</span>}

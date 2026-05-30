@@ -99,18 +99,18 @@ export function LocksList(): React.ReactElement {
                 key={`${lock.kind}-${i}`}
                 className={`rounded-md border px-3 py-2 ${cls}`}
               >
-                <div className="flex items-baseline justify-between">
-                  <span className="font-mono text-xs font-bold tracking-wider">
+                <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                  <span className="shrink-0 font-mono text-xs font-bold tracking-wider">
                     {t(labelKey)}
                   </span>
                   {lock.remainingSec !== undefined && (
-                    <span className="font-mono text-xs tabular-nums">
+                    <span className="shrink-0 font-mono text-xs tabular-nums">
                       {formatLockDuration(lock.remainingSec)}
                     </span>
                   )}
                 </div>
                 {lock.reason && (
-                  <div className="text-text-t2 mt-1 text-2xs leading-relaxed">
+                  <div className="text-text-t2 mt-1 overflow-hidden text-ellipsis text-2xs leading-relaxed">
                     {lock.reason}
                   </div>
                 )}

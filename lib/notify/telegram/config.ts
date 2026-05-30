@@ -18,23 +18,25 @@ export interface TelegramConfig {
  * Test'te `env` parametresi inject edilir (process.env mock).
  */
 export function loadTelegramConfigFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = (typeof process !== "undefined" ? process.env : {}),
 ): TelegramConfig | null {
-  const botToken = env.TELEGRAM_BOT_TOKEN;
-  const chatId = env.TELEGRAM_VIP_CHAT_ID;
+  const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = env.TELEGRAM_VIP_CHAT_ID?.trim();
 
-  if (!botToken || !chatId) return null;
-  if (botToken.trim() === "" || chatId.trim() === "") return null;
+  if (!botToken || !chatId) {
+    if (typeof console !== "undefined") {
+      console.warn("[QUANTIX ENV] ⚠️  TELEGRAM_BOT_TOKEN veya TELEGRAM_VIP_CHAT_ID eksik — bildirimler devre dışı.");
+    }
+    return null;
+  }
+  if (!botToken.includes(":")) {
+    if (typeof console !== "undefined") {
+      console.warn("[QUANTIX ENV] ⚠️  TELEGRAM_BOT_TOKEN formatı geçersiz (beklenen: '<id>:<token>').");
+    }
+    return null;
+  }
 
-  // Bot token format kontrolü — kabaca "<digits>:<token>"
-  // Telegram bot token formatı: "<bot_id>:<35-char base64>"
-  // Sıkı validation yapmıyoruz (BotFather formatı değişebilir), sadece ":" var mı
-  if (!botToken.includes(":")) return null;
-
-  return {
-    botToken: botToken.trim(),
-    chatId: chatId.trim(),
-  };
+  return { botToken, chatId };
 }
 
 /**

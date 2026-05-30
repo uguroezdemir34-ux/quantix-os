@@ -15,3 +15,28 @@ body {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Mobil yatay taşma koruması — iOS/Android dikey ekran */
+html {
+  overflow-x: hidden;
+}
+
+body {
+  /* iOS Safari'de rubber-band scroll overflow sorununu önler */
+  overflow-x: hidden;
+  /* Tabular sayısal veri (P&L, fiyat) her zaman sabit genişlikte */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tüm monospace sayısal değerler ekran dışına çıkmasın */
+.font-mono {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* iOS input zoom koruması — 16px'in altındaki input'lar zoom tetikler */
+input,
+select,
+textarea {
+  font-size: max(16px, 1rem);
+}
