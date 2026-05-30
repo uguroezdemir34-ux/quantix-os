@@ -18,6 +18,7 @@
     "analyze": "ANALYZE=true next build",
     "perf:check": "tsx scripts/bundle-budget.ts",
     "smoke": "tsx scripts/smoke-prod.ts",
+    "quantix:install": "node scripts/quantix-install.mjs",
     "quantix:check-env": "node -e \"const fs=require('fs');const ex=fs.readFileSync('.env.example','utf8');const vars=ex.match(/^[A-Z_]+=.*/gm)?.map(l=>l.split('=')[0])||[];const env=fs.existsSync('.env.local')?fs.readFileSync('.env.local','utf8'):'';let ok=true;vars.forEach(v=>{if(!env.includes(v+'=')){console.warn('[QUANTIX] EKSIK: '+v);ok=false;}else{console.log('[QUANTIX] OK: '+v);}});if(!ok){console.error('\\n.env.local eksik değişkenler var. cp .env.example .env.local yapın.');process.exit(1);}console.log('\\n[QUANTIX] Tüm env değişkenleri mevcut.');\"",
     "quantix:up": "pnpm quantix:check-env && pnpm build && pnpm start"
   },
