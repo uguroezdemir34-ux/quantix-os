@@ -23,7 +23,8 @@ export default function GrafikPage() {
   const [showEma50, setShowEma50] = useState(true);
   const [showTrades, setShowTrades] = useState(false);
 
-  const candles = useCandleStore((s) => s.candles[`${pair}_${timeframe}`] ?? []);
+  const candlesRaw = useCandleStore((s) => s.candles[`${pair}_${timeframe}`]);
+  const candles = candlesRaw ?? [];
   const trades = useTradesStore((s) => s.trades);
 
   const series: ChartSeries = useMemo(() => {

@@ -11,14 +11,27 @@ import { FundingRateRow } from "@/components/piyasa/FundingRateRow";
 import { computeMtfTrend } from "@/lib/market/mtfTrend";
 
 export default function PiyasaPage() {
-  const store = useMacroStore();
+  const marketSummary = useMacroStore((s) => s.marketSummary);
+  const fgInfo = useMacroStore((s) => s.fgInfo);
+  const fgLoading = useMacroStore((s) => s.fgLoading);
+  const dominance = useMacroStore((s) => s.dominance);
+  const domLoading = useMacroStore((s) => s.domLoading);
+  const fundingBtc = useMacroStore((s) => s.fundingBtc);
+  const fundingEth = useMacroStore((s) => s.fundingEth);
+  const fundingLoading = useMacroStore((s) => s.fundingLoading);
 
-  const btc1h = useCandleStore((s) => s.candles["BTC_1h"] ?? []);
-  const btc4h = useCandleStore((s) => s.candles["BTC_4h"] ?? []);
-  const btc1d = useCandleStore((s) => s.candles["BTC_1d"] ?? []);
-  const eth1h = useCandleStore((s) => s.candles["ETH_1h"] ?? []);
-  const eth4h = useCandleStore((s) => s.candles["ETH_4h"] ?? []);
-  const eth1d = useCandleStore((s) => s.candles["ETH_1d"] ?? []);
+  const btc1hRaw = useCandleStore((s) => s.candles["BTC_1h"]);
+  const btc4hRaw = useCandleStore((s) => s.candles["BTC_4h"]);
+  const btc1dRaw = useCandleStore((s) => s.candles["BTC_1d"]);
+  const eth1hRaw = useCandleStore((s) => s.candles["ETH_1h"]);
+  const eth4hRaw = useCandleStore((s) => s.candles["ETH_4h"]);
+  const eth1dRaw = useCandleStore((s) => s.candles["ETH_1d"]);
+  const btc1h = btc1hRaw ?? [];
+  const btc4h = btc4hRaw ?? [];
+  const btc1d = btc1dRaw ?? [];
+  const eth1h = eth1hRaw ?? [];
+  const eth4h = eth4hRaw ?? [];
+  const eth1d = eth1dRaw ?? [];
 
   const btcMtf = useMemo(
     () =>
@@ -38,14 +51,14 @@ export default function PiyasaPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <MarketSummaryBanner summary={store.marketSummary} />
-      <FearGreedGauge info={store.fgInfo} loading={store.fgLoading} />
-      <DominanceCard info={store.dominance} loading={store.domLoading} />
+      <MarketSummaryBanner summary={marketSummary} />
+      <FearGreedGauge info={fgInfo} loading={fgLoading} />
+      <DominanceCard info={dominance} loading={domLoading} />
       <MtfTrendGrid btc={btcMtf} eth={ethMtf} />
       <FundingRateRow
-        btc={store.fundingBtc}
-        eth={store.fundingEth}
-        loading={store.fundingLoading}
+        btc={fundingBtc}
+        eth={fundingEth}
+        loading={fundingLoading}
       />
     </div>
   );

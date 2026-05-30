@@ -48,7 +48,8 @@ export function useFlowIntelligence(
   const vpinRef = useRef<VpinState | null>(null);
 
   const trades = useTradeFeedStore(selectTrades(pair));
-  const candles1h = useCandleStore((s) => s.candles[`${pair}_1h`] ?? []);
+  const candles1hRaw = useCandleStore((s) => s.candles[`${pair}_1h`]);
+  const candles1h = candles1hRaw ?? [];
   const livePrice = useMarketStore((s) => s.prices[pair]?.last ?? null);
 
   useEffect(() => {
