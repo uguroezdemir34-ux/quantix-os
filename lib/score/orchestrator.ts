@@ -137,6 +137,18 @@ export interface ScoreInput {
 
   // Şu an (test edilebilirlik)
   now: number;
+
+  /**
+   * OI velocity skoru [-10, +10] — oi-velocity.ts çıktısından beslenir.
+   * null/undefined → 0 (tarafsız, alternatif veri yoksa atlanır).
+   */
+  oiVelocityScore?: number | null;
+
+  /**
+   * Whale inflow skoru [-10, +10] — whale-flow.ts çıktısından beslenir.
+   * null/undefined → 0 (tarafsız).
+   */
+  whaleInflowScore?: number | null;
 }
 
 export type Verdict = "go" | "wait" | "no";
@@ -318,9 +330,11 @@ export function computeScore(input: ScoreInput): ScoreResult {
   });
 
   // ───── 5. Total ─────
+  const oiBonus = input.oiVelocityScore ?? 0;
+  const whaleBonus = input.whaleInflowScore ?? 0;
   const total = Math.min(
     100,
-    Math.max(0, baseScore + sweepRes.bonus + regimeRes.bonus + srModifier),
+    Math.max(0, baseScore + sweepRes.bonus + regimeRes.bonus + srModifier + oiBonus + whaleBonus),
   );
   const score = Math.round(total);
 
