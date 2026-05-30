@@ -36,8 +36,11 @@ export function computePositionSize(
     ? assessSpread(input.spreadContext)
     : null;
   const orderMode = spreadAssessment?.orderMode ?? "market";
+  // NEUTRAL direction için fee kalibrasyonu yapılmaz (LONG fallback)
+  const feeDirection: "LONG" | "SHORT" =
+    direction === "SHORT" ? "SHORT" : "LONG";
   const feeAdjTp = calibrateTpForFee(
-    direction,
+    feeDirection,
     px,
     tp.tp1Price,
     tp.tp2Price,
