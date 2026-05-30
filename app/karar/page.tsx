@@ -40,8 +40,10 @@ export default function KararPage() {
 
   const result = useScoreStore((s) => s.results[activePair]);
   const computing = useScoreStore((s) => s.computing);
-  const candles1h = useCandleStore((s) => s.candles[`${activePair}_1h`] ?? []);
-  const candles4h = useCandleStore((s) => s.candles[`${activePair}_4h`] ?? []);
+  const candles1hRaw = useCandleStore((s) => s.candles[`${activePair}_1h`]);
+  const candles4hRaw = useCandleStore((s) => s.candles[`${activePair}_4h`]);
+  const candles1h = candles1hRaw ?? [];
+  const candles4h = candles4hRaw ?? [];
   const livePrice = useMarketStore((s) => s.prices[activePair]?.last ?? null);
   const balanceTotal = useAccountStore((s) => s.balanceTotal);
   const balanceFree = useAccountStore((s) => s.balanceFree);
