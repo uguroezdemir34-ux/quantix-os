@@ -3,37 +3,30 @@
 /**
  * USE TRADE FEED — OKX WS trades kanalını tradeFeedStore'a besler.
  *
- * useMarketStream ile AYNI singleton client'ı paylaşır (ayrı WS yok).
- * client.onTradeRaw() → tradeFeedStore.ingest() zinciri kurulur.
- *
- * SSR-safe: window kontrolü ile.
+ * Action'lar getState() ile alınır (store subscription yok → re-render yok).
+ * Effect sadece mount'ta çalışır, trade mesajları async callback'te işlenir.
  */
 
 import { useEffect } from "react";
 import { useTradeFeedStore } from "@/lib/store/tradeFeedStore";
 import type { Pair } from "@/lib/constants/pairs";
 import type { OkxTradeRaw } from "@/lib/orderflow/types";
-
-// useMarketStream singleton'ına erişmek için module augmentation yerine
-// dinamik import (circular dependency kaçınmak için).
 import { getActiveMarketClient } from "@/lib/ws/marketClientRef";
 
 export function useTradeFeed(): void {
-  const ingest = useTradeFeedStore((s) => s.ingest);
-  const setConnection = useTradeFeedStore((s) => s.setConnection);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Singleton client'a erişim — useMarketStream zaten oluşturmuş olmalı
     const client = getActiveMarketClient();
     if (!client) return;
+
+    // getState() — store subscribe etmeden stable action referansı alır
+    const { ingest, setConnection } = useTradeFeedStore.getState();
 
     const unsubTrades = client.onTradeRaw((pair: Pair, raws: OkxTradeRaw[]) => {
       ingest(pair, raws);
     });
 
-    // Connection state — market stream bağlandığında feed de "live" sayılır
     const unsubStatus = client.onStatus((state) => {
       const cs =
         state.status === "connected" || state.status === "silent"
@@ -51,5 +44,6 @@ export function useTradeFeed(): void {
       unsubTrades();
       unsubStatus();
     };
-  }, [ingest, setConnection]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }
