@@ -3,8 +3,9 @@
 /**
  * USE TRADE FEED — OKX WS trades kanalını tradeFeedStore'a besler.
  *
- * Action'lar getState() ile alınır (store subscription yok → re-render yok).
- * Effect sadece mount'ta çalışır, trade mesajları async callback'te işlenir.
+ * Throttle: WS mesajları 200ms'de bir batched olarak ingest edilir.
+ * Bu, saniyede onlarca gelen trade mesajının her birinde store update
+ * tetiklenmesini önler → render storm yok.
  */
 
 import { useEffect } from "react";
@@ -13,6 +14,8 @@ import type { Pair } from "@/lib/constants/pairs";
 import type { OkxTradeRaw } from "@/lib/orderflow/types";
 import { getActiveMarketClient } from "@/lib/ws/marketClientRef";
 
+const THROTTLE_MS = 200;
+
 export function useTradeFeed(): void {
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -20,11 +23,27 @@ export function useTradeFeed(): void {
     const client = getActiveMarketClient();
     if (!client) return;
 
-    // getState() — store subscribe etmeden stable action referansı alır
     const { ingest, setConnection } = useTradeFeedStore.getState();
 
+    // Batch buffer: pair → birikmiş raw trade'ler
+    const pending: Partial<Record<Pair, OkxTradeRaw[]>> = {};
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    function flush() {
+      timer = null;
+      for (const pair of Object.keys(pending) as Pair[]) {
+        const raws = pending[pair];
+        if (raws && raws.length > 0) {
+          ingest(pair, raws);
+          pending[pair] = [];
+        }
+      }
+    }
+
     const unsubTrades = client.onTradeRaw((pair: Pair, raws: OkxTradeRaw[]) => {
-      ingest(pair, raws);
+      if (!pending[pair]) pending[pair] = [];
+      pending[pair]!.push(...raws);
+      if (!timer) timer = setTimeout(flush, THROTTLE_MS);
     });
 
     const unsubStatus = client.onStatus((state) => {
@@ -41,6 +60,7 @@ export function useTradeFeed(): void {
     });
 
     return () => {
+      if (timer) clearTimeout(timer);
       unsubTrades();
       unsubStatus();
     };
