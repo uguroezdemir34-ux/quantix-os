@@ -78,6 +78,23 @@ export interface PositionSizerInput {
   };
   /** Skor (bucket lookup zaten yapıldı, sizer için info) */
   score: number;
+  /**
+   * Opsiyonel komisyon bağlamı — OKX'ten alınan anlık fee oranları.
+   * Verilirse TP fee-amortize edilir.
+   */
+  feeContext?: {
+    takerFeeRate: number;
+    makerFeeRate: number;
+    lastFillFeeRate?: number;
+  };
+  /**
+   * Opsiyonel order book spread bağlamı.
+   * Verilirse MARKET/LIMIT modu dinamik olarak seçilir.
+   */
+  spreadContext?: {
+    currentSpread: number;
+    normalSpread: number;
+  };
 }
 
 export interface PositionSizerResult {
@@ -116,6 +133,16 @@ export interface PositionSizerResult {
   warnKind: "ok" | "insufficient_margin" | "below_min_size" | "locked";
   /** Uyarı metni (default TR) */
   warnMessage: string;
+  /**
+   * Emir modu — spread/fee bağlamı varsa dinamik, yoksa her zaman "market".
+   */
+  orderMode: "market" | "limit";
+  /**
+   * Fee-kalibre edilmiş TP fiyatları.
+   * feeContext verilmezse orijinal TP fiyatlarıyla aynı.
+   */
+  feeAdjustedTp1: number;
+  feeAdjustedTp2: number;
 }
 
 /**

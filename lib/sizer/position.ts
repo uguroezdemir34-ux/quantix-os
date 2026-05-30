@@ -12,6 +12,11 @@ import { SIZER_CONFIG } from "./types";
 import { computeStructuralStop } from "./stop";
 import { computeAdaptiveTPs } from "./take-profit";
 import { computeRiskUsd, suggestLeverage } from "./risk";
+import {
+  assessSpread,
+  calibrateTpForFee,
+  defaultFeeContext,
+} from "./fee-spread-model";
 
 export function computePositionSize(
   input: PositionSizerInput,
@@ -24,6 +29,21 @@ export function computePositionSize(
 
   // 2. TP hesabı
   const tp = computeAdaptiveTPs(direction, px, atr, adx1h);
+
+  // 2b. Fee & spread modeli (opsiyonel)
+  const feeCtx = input.feeContext ?? defaultFeeContext();
+  const spreadAssessment = input.spreadContext
+    ? assessSpread(input.spreadContext)
+    : null;
+  const orderMode = spreadAssessment?.orderMode ?? "market";
+  const feeAdjTp = calibrateTpForFee(
+    direction,
+    px,
+    tp.tp1Price,
+    tp.tp2Price,
+    feeCtx,
+    orderMode,
+  );
 
   // 3. Risk hesabı
   const risk = computeRiskUsd({
@@ -91,5 +111,8 @@ export function computePositionSize(
     warnLevel,
     warnKind,
     warnMessage,
+    orderMode,
+    feeAdjustedTp1: feeAdjTp.adjustedTp1,
+    feeAdjustedTp2: feeAdjTp.adjustedTp2,
   };
 }
