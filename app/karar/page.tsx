@@ -43,20 +43,28 @@ export default function KararPage() {
   const candles1h = useCandleStore((s) => s.candles[`${activePair}_1h`] ?? []);
   const candles4h = useCandleStore((s) => s.candles[`${activePair}_4h`] ?? []);
   const livePrice = useMarketStore((s) => s.prices[activePair]?.last ?? null);
-  const accountStore = useAccountStore();
-  const settings = useSettingsStore();
-  const riskStore = useRiskStore();
-  const tradesStore = useTradesStore();
-  const macroStore = useMacroStore();
+  const balanceTotal = useAccountStore((s) => s.balanceTotal);
+  const balanceFree = useAccountStore((s) => s.balanceFree);
+  const drawdownProtocol = useAccountStore((s) => s.drawdownProtocol);
+  const maxTradesPerDay = useSettingsStore((s) => s.maxTradesPerDay);
+  const demoMode = useSettingsStore((s) => s.demoMode);
+  const btcCooldownUntil = useRiskStore((s) => s.btcCooldownUntil);
+  const btcSelfCooldownUntil = useRiskStore((s) => s.btcSelfCooldownUntil);
+  const logEvent = useRiskStore((s) => s.logEvent);
+  const trades = useTradesStore((s) => s.trades);
+  const openPending = useTradesStore((s) => s.openPending);
+  const fundingBtc = useMacroStore((s) => s.fundingBtc);
+  const fundingEth = useMacroStore((s) => s.fundingEth);
+  const fgValue = useMacroStore((s) => s.fgValue);
 
   // Bucket istatistikleri — geçmiş trade'lerden score bazlı performans
   const bucketStats = useMemo(() => {
     if (!result) return null;
-    const closedTrades = tradesStore.trades
+    const closedTrades = trades
       .filter((t) => t.status === "closed" && t.exit != null && t.pair === activePair)
       .map((t) => ({ score: t.entryContext.score, pnlUsd: t.exit!.pnlUsd }));
     return getBucketStats(result.score, closedTrades);
-  }, [result, tradesStore.trades, activePair]);
+  }, [result, trades, activePair]);
 
   // Signal direction for flow intelligence (uppercase: "LONG" | "SHORT")
   const signalDir: "LONG" | "SHORT" =
@@ -98,7 +106,6 @@ export default function KararPage() {
     if (!livePrice || !atrValue) return null;
     if (result.direction !== "LONG" && result.direction !== "SHORT") return null;
 
-    const protocol = accountStore.drawdownProtocol;
     return computePositionSize({
       pair: activePair,
       direction: result.direction,
@@ -108,13 +115,13 @@ export default function KararPage() {
       swingLow: swingLevels.swingLow,
       swingHigh: swingLevels.swingHigh,
       balance: {
-        total: accountStore.balanceTotal,
-        free: accountStore.balanceFree,
+        total: balanceTotal,
+        free: balanceFree,
       },
       drawdownProtocol: {
-        tier: protocol.tier,
-        multiplier: protocol.multiplier,
-        label: protocol.label,
+        tier: drawdownProtocol.tier,
+        multiplier: drawdownProtocol.multiplier,
+        label: drawdownProtocol.label,
       },
       bucket: bucketStats ?? {
         n: 0,
@@ -127,7 +134,7 @@ export default function KararPage() {
       },
       score: result.score,
     });
-  }, [result, livePrice, atrValue, adxValue, swingLevels, activePair, accountStore]);
+  }, [result, livePrice, atrValue, adxValue, swingLevels, activePair, balanceTotal, balanceFree, drawdownProtocol]);
 
   async function handleConfirm() {
     if (!sizerResult || !result || !livePrice) return;
@@ -137,7 +144,7 @@ export default function KararPage() {
     setExecError(null);
 
     const today = new Date();
-    const todayTrades = tradesStore.trades.filter((t) => {
+    const todayTrades = trades.filter((t) => {
       const d = new Date(t.openedAt);
       return (
         d.getFullYear() === today.getFullYear() &&
@@ -147,7 +154,7 @@ export default function KararPage() {
     });
 
     const fundingResult =
-      activePair === "BTC" ? macroStore.fundingBtc : macroStore.fundingEth;
+      activePair === "BTC" ? fundingBtc : fundingEth;
 
     try {
       const output = await orchestrate(
@@ -162,15 +169,15 @@ export default function KararPage() {
           marginMode: "cross",
           source: "manual",
           accountState: {
-            drawdownProtocol: accountStore.drawdownProtocol,
-            btcCooldownUntil: riskStore.btcCooldownUntil,
-            btcSelfCooldownUntil: riskStore.btcSelfCooldownUntil,
+            drawdownProtocol,
+            btcCooldownUntil,
+            btcSelfCooldownUntil,
             todayTradeCount: todayTrades.length,
-            maxTradesPerDay: settings.maxTradesPerDay,
+            maxTradesPerDay,
           },
         },
         {
-          adapter: getOkxAdapter(settings.demoMode),
+          adapter: getOkxAdapter(demoMode),
           channels: [createChannel("telegram")],
           dedupeStore: getGlobalDedupeStore(),
         },
@@ -178,7 +185,7 @@ export default function KararPage() {
 
       // Disiplin logu — her durumda kayıt
       const je = output.journalEntry;
-      riskStore.logEvent(je.type as Parameters<typeof riskStore.logEvent>[0], {
+      logEvent(je.type as Parameters<typeof logEvent>[0], {
         pair: je.pair,
         direction: je.direction,
         score: je.score,
@@ -188,7 +195,7 @@ export default function KararPage() {
       });
 
       if (output.ok) {
-        tradesStore.openPending({
+        openPending({
           pair: activePair,
           direction: result.direction,
           entryPrice: livePrice,
@@ -202,9 +209,9 @@ export default function KararPage() {
           entryContext: {
             score: result.score,
             verdict: result.verdict,
-            fgValue: macroStore.fgValue ?? undefined,
+            fgValue: fgValue ?? undefined,
             fundingRate: fundingResult?.fundingRate ?? undefined,
-            drawdownTier: accountStore.drawdownProtocol.tier,
+            drawdownTier: drawdownProtocol.tier,
           },
           orderId: output.tradeResult?.data?.orderId,
         });
