@@ -26,7 +26,6 @@ import {
   computeWhaleFlowWindow,
   whaleInflowScoreOrZero,
   type WhaleFlowSnapshot,
-  type WhaleFlowConfig,
 } from "@/lib/market/whale-flow";
 
 // ── Score Engine ──────────────────────────────────────────────
@@ -87,7 +86,7 @@ function makeMinimalScoreInput(overrides: Partial<ScoreInput> = {}): ScoreInput 
     rsi: 55,
     adx: 30,
     bbPct: 0.5,
-    vwap: { vwap: 49000, std: 500, upperBand: 50000, lowerBand: 48000 },
+    vwap: { vwap: 49000, stddev: 500 },
     volRatio: 1.2,
     fundingRate: 0.0001,
     atrPercentile: 50,
@@ -96,7 +95,7 @@ function makeMinimalScoreInput(overrides: Partial<ScoreInput> = {}): ScoreInput 
     closes1h: Array(12).fill(50000),
     volumes1h: Array(15).fill(1000),
     srModifier: 0,
-    sweep15m: { type: "none" },
+    sweep15m: { type: null, strength: 0 },
     fg: 50,
     last4hMovePct: 0.5,
     timeQuality: { quality: 1, reason: "ok" },
@@ -594,7 +593,7 @@ describe("composeScoreInput — alt data passthrough", () => {
       "50000000", // volCcy
       "50000000", // volCcyQuote
       "1",     // confirm
-    ] as import("@/lib/okx/candles").Candle);
+    ] as unknown as import("@/lib/okx/candles").Candle);
   }
 
   const base4h = makeCandles(200);
@@ -617,7 +616,7 @@ describe("composeScoreInput — alt data passthrough", () => {
     drawdownProtocol: { tier: "normal", minScore: 80, label: "Normal", reason: "" },
     trades: [],
     srModifier: 0,
-    sweep15m: { type: "none" },
+    sweep15m: { type: null, strength: 0 },
     timeQuality: { quality: 1, reason: "ok" },
     now: 1_700_000_000_000,
   };
