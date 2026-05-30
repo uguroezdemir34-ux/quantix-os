@@ -24,7 +24,17 @@ import {
   confirmOpen,
   closeTrade,
   detectTpSlHit,
+  pruneOldClosedTrades,
+  mergeIntoArchive,
+  DEFAULT_PRUNE_AGE_MS,
+  type PruneResult,
 } from "@/lib/trades/state";
+import {
+  loadArchive,
+  saveArchive,
+  MAX_ARCHIVE_SIZE,
+  ARCHIVE_STORAGE_KEY,
+} from "@/lib/trades/pruner";
 
 const MAX_TRADES = 500;
 const STORAGE_KEY = "trade_snapshots";
@@ -78,6 +88,12 @@ const tradesArraySchema = z.array(tradeSnapshotSchema);
 
 interface TradesStoreState {
   trades: TradeSnapshot[];
+  /**
+   * Arşiv — 48h+ geçmiş CLOSED trade'ler (sıkıştırılmış log).
+   * Skor motoru bu diziyi kullanmaz — yalnızca analiz/export içindir.
+   * localStorage'dan lazy yüklenir, max MAX_ARCHIVE_SIZE kaydı tutar.
+   */
+  archivedTrades: TradeSnapshot[];
 
   // Lifecycle actions
   openPending: (input: OpenTradeInput) => TradeSnapshot;
@@ -86,6 +102,18 @@ interface TradesStoreState {
 
   // TP/SL polling helper
   checkTpSl: (pair: string, high: number, low: number, now?: number) => void;
+
+  /**
+   * Memory Pruning — 48h+ eski CLOSED trade'leri live state'ten çıkarır,
+   * arşive taşır. Skor motoru latency'sini <1ms'de tutar.
+   *
+   * @param now  Epoch ms (test inject — varsayılan Date.now())
+   * @param maxAgeMs  Prune yaşı eşiği (varsayılan 48h)
+   */
+  pruneOldClosed: (now?: number, maxAgeMs?: number) => PruneResult;
+
+  /** Arşiv dizisini döndür (okuma) */
+  getArchivedTrades: () => TradeSnapshot[];
 
   // Queries
   getById: (id: string) => TradeSnapshot | undefined;
@@ -100,6 +128,7 @@ interface TradesStoreState {
 
 export const useTradesStore = create<TradesStoreState>((set, get) => ({
   trades: [],
+  archivedTrades: [],
 
   openPending: (input) => {
     const snap = createPendingTrade(input);
@@ -154,6 +183,36 @@ export const useTradesStore = create<TradesStoreState>((set, get) => ({
     }
   },
 
+  pruneOldClosed: (now = Date.now(), maxAgeMs = DEFAULT_PRUNE_AGE_MS) => {
+    const current = get().trades;
+    const result = pruneOldClosedTrades(current, now, maxAgeMs);
+
+    if (result.prunedCount > 0) {
+      // Mevcut arşivi yükle (lazy — store'daki archivedTrades veya localStorage)
+      const storeArchive = get().archivedTrades;
+      const diskArchive = storeArchive.length > 0 ? storeArchive : loadArchive();
+      const updatedArchive = mergeIntoArchive(diskArchive, result.pruned, MAX_ARCHIVE_SIZE);
+
+      saveToStorage(STORAGE_KEY, result.live);
+      saveArchive(updatedArchive, MAX_ARCHIVE_SIZE);
+
+      set({ trades: result.live, archivedTrades: updatedArchive });
+    }
+
+    return result;
+  },
+
+  getArchivedTrades: () => {
+    const storeArchive = get().archivedTrades;
+    if (storeArchive.length > 0) return storeArchive;
+    // Lazy load from localStorage
+    const disk = loadArchive();
+    if (disk.length > 0) {
+      set({ archivedTrades: disk });
+    }
+    return disk;
+  },
+
   getById: (id) => get().trades.find((t) => t.id === id),
 
   getOpen: () => get().trades.filter((t) => t.status === "open"),
@@ -169,7 +228,8 @@ export const useTradesStore = create<TradesStoreState>((set, get) => ({
 
   _reset: () => {
     saveToStorage(STORAGE_KEY, []);
-    set({ trades: [] });
+    saveToStorage(ARCHIVE_STORAGE_KEY, []);
+    set({ trades: [], archivedTrades: [] });
   },
 }));
 
@@ -210,3 +270,5 @@ export const selectClosedTrades = (s: TradesStoreState): TradeSnapshot[] =>
 export const selectStatus = (status: TradeStatus) =>
   (s: TradesStoreState): TradeSnapshot[] =>
     s.trades.filter((t) => t.status === status);
+export const selectArchivedTrades = (s: TradesStoreState): TradeSnapshot[] =>
+  s.archivedTrades;

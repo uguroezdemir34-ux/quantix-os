@@ -9,6 +9,10 @@
  * Yasak geçişler:
  *   closed → herhangi bir şey (immutable)
  *   open → pending (geri dönüş yok)
+ *
+ * Memory Pruning (v2):
+ *   CLOSED + 48h geçmiş trade'ler live state'ten çıkarılır → arşive taşınır.
+ *   Bu, getBucketStats() O(n) döngüsünü küçük n'de sabitler → <1ms latency garantisi.
  */
 
 import type {
@@ -262,4 +266,110 @@ export function detectTpSlHit(
   }
 
   return null;
+}
+
+// ═══════════════ MEMORY PRUNING ═══════════════
+
+/** Varsayılan prune eşiği: 48 saat */
+export const DEFAULT_PRUNE_AGE_MS = 48 * 60 * 60 * 1000;
+
+/** pruneOldClosedTrades() sonucu */
+export interface PruneResult {
+  /** Zustand live state'te kalacak trade'ler (aktif + henüz taze kapanmışlar) */
+  live: TradeSnapshot[];
+  /** Arşive taşınan eski CLOSED trade'ler */
+  pruned: TradeSnapshot[];
+  /** Arşive taşınan kayıt sayısı */
+  prunedCount: number;
+  /** Prune öncesi toplam kayıt sayısı */
+  totalBefore: number;
+}
+
+/**
+ * Eski CLOSED trade'leri live state'ten çıkar.
+ *
+ * Kural:
+ *   - status !== 'closed' → ASLA prune edilmez (açık/bekleyen trade kalmaz)
+ *   - status === 'closed' + exit.closedAt + maxAgeMs geçmişse → prune
+ *   - exit.closedAt yoksa (bozuk veri) → prune (güvenli taraf)
+ *
+ * Saf fonksiyon — I/O yok, yan etki yok.
+ *
+ * @param trades    Mevcut trade listesi
+ * @param nowMs     Şu an (epoch ms) — test inject için
+ * @param maxAgeMs  Bu süreden eski kapanmış trade'ler arşive alınır
+ */
+export function pruneOldClosedTrades(
+  trades: readonly TradeSnapshot[],
+  nowMs: number,
+  maxAgeMs: number = DEFAULT_PRUNE_AGE_MS,
+): PruneResult {
+  const live: TradeSnapshot[] = [];
+  const pruned: TradeSnapshot[] = [];
+
+  for (const t of trades) {
+    if (t.status !== "closed") {
+      live.push(t);
+      continue;
+    }
+    const closedAt = t.exit?.closedAt ?? 0;
+    const age = nowMs - closedAt;
+    if (age >= maxAgeMs) {
+      pruned.push(t);
+    } else {
+      live.push(t);
+    }
+  }
+
+  return {
+    live,
+    pruned,
+    prunedCount: pruned.length,
+    totalBefore: trades.length,
+  };
+}
+
+/**
+ * Arşiv dizisini max boyuta kısalt — en eskiler atılır.
+ * localStorage şişmesini önler.
+ *
+ * @param archive    Mevcut arşiv
+ * @param incoming   Yeni eklenecek kayıtlar
+ * @param maxSize    Arşiv max boyutu
+ */
+export function mergeIntoArchive(
+  archive: readonly TradeSnapshot[],
+  incoming: readonly TradeSnapshot[],
+  maxSize: number,
+): TradeSnapshot[] {
+  const merged = [...archive, ...incoming];
+  if (merged.length <= maxSize) return merged;
+  // En eski kapanmışları at (closedAt'e göre sırala)
+  merged.sort((a, b) => (a.exit?.closedAt ?? 0) - (b.exit?.closedAt ?? 0));
+  return merged.slice(merged.length - maxSize);
+}
+
+/**
+ * Score engine'e beslenen trade listesi için latency bütçe ölçümü.
+ *
+ * getBucketStats() çağrısının süresini µs cinsinden ölçer.
+ * 1ms (= 1000µs) eşiğini geçerse warn flag döndürür.
+ *
+ * @param scoreValue   Mevcut score (bucket lookup için)
+ * @param liveTrades   Live state trade listesi
+ * @param getBucketFn  getBucketStats fonksiyonu (DI — test edilebilir)
+ */
+export function measureBucketLatency<T>(
+  scoreValue: number,
+  liveTrades: readonly import("@/lib/bucket/stats").Trade[],
+  getBucketFn: (score: number, trades: readonly import("@/lib/bucket/stats").Trade[]) => T,
+): { result: T; durationUs: number; overBudget: boolean } {
+  const t0 = performance.now();
+  const result = getBucketFn(scoreValue, liveTrades);
+  const durationUs = (performance.now() - t0) * 1000; // ms → µs
+  return {
+    result,
+    durationUs,
+    overBudget: durationUs > 1000, // 1ms = 1000µs
+  };
 }
