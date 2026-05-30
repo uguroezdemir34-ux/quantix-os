@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { useCandleStore } from "@/lib/store/candleStore";
+import { useCandleStore, EMPTY_CANDLES } from "@/lib/store/candleStore";
 import { useTradesStore } from "@/lib/store/tradesStore";
 import { ChartControls } from "@/components/grafik/ChartControls";
 import { ChartLegend } from "@/components/grafik/ChartLegend";
@@ -24,7 +24,7 @@ export default function GrafikPage() {
   const [showTrades, setShowTrades] = useState(false);
 
   const candlesRaw = useCandleStore((s) => s.candles[`${pair}_${timeframe}`]);
-  const candles = candlesRaw ?? [];
+  const candles = candlesRaw ?? EMPTY_CANDLES;
   const trades = useTradesStore((s) => s.trades);
 
   const series: ChartSeries = useMemo(() => {

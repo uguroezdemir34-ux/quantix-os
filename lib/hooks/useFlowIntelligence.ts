@@ -3,16 +3,9 @@
 /**
  * USE FLOW INTELLIGENCE — CVD + VPIN + SMC + Liq pipeline.
  *
- * Okuma zinciri:
- *   tradeFeedStore (canlı trade'ler) +
- *   candleStore (1h mum'lar SMC/Liq için) +
- *   marketStore (canlı fiyat)
- *   → enrichWithFlowIntelligence()
- *   → FlowIntelligenceResult
- *
- * VPIN state'i ref'te tutulur (render'lar arası kalıcı, store'a yazılmaz).
- *
- * Sonuç: null iken "hazırlanıyor", hesap tamamlanınca FlowIntelligenceResult.
+ * Stable referans kuralı:
+ *   useCandleStore selector'ı EMPTY_CANDLES sabitini fallback olarak kullanır.
+ *   Bu sayede candle verisi yokken her render'da yeni [] üretilmez → döngü yok.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -20,7 +13,7 @@ import type { Pair } from "@/lib/constants/pairs";
 import type { FlowIntelligenceResult } from "@/lib/orderflow/flowIntelligence";
 import { enrichWithFlowIntelligence } from "@/lib/orderflow/flowIntelligence";
 import { useTradeFeedStore, selectTrades } from "@/lib/store/tradeFeedStore";
-import { useCandleStore } from "@/lib/store/candleStore";
+import { useCandleStore, EMPTY_CANDLES } from "@/lib/store/candleStore";
 import { useMarketStore } from "@/lib/store/marketStore";
 import { createVpinState, ingestTradesIntoVpin } from "@/lib/orderflow/vpin";
 import type { VpinState } from "@/lib/orderflow/vpin";
@@ -28,7 +21,6 @@ import type { Candle as SmcCandle } from "@/lib/orderflow/smc";
 import type { Candle as OkxCandle } from "@/lib/okx/candles";
 import type { SignalDirection } from "@/lib/orderflow/flowVerdict";
 
-/** okx/candles.ts Candle → smc.ts Candle */
 function toSmcCandle(c: OkxCandle): SmcCandle {
   return {
     time: c.ts,
@@ -48,20 +40,23 @@ export function useFlowIntelligence(
   const vpinRef = useRef<VpinState | null>(null);
 
   const trades = useTradeFeedStore(selectTrades(pair));
+
+  // EMPTY_CANDLES: module-level frozen array — undefined durumunda her render'da
+  // yeni [] üretmez, stable referans döndürür → useEffect döngüsünü kırar
   const candles1hRaw = useCandleStore((s) => s.candles[`${pair}_1h`]);
-  const candles1h = candles1hRaw ?? [];
+  const candles1h = candles1hRaw ?? EMPTY_CANDLES;
+
   const livePrice = useMarketStore((s) => s.prices[pair]?.last ?? null);
 
   useEffect(() => {
     if (trades.length === 0 || !livePrice) return;
 
-    // VPIN state'i güncelle (feed gelince arttırılır)
     if (!vpinRef.current) {
       vpinRef.current = createVpinState(pair);
     }
     vpinRef.current = ingestTradesIntoVpin(vpinRef.current, trades);
 
-    const smcCandles: SmcCandle[] = candles1h.map(toSmcCandle);
+    const smcCandles: SmcCandle[] = (candles1h as OkxCandle[]).map(toSmcCandle);
 
     const flowResult = enrichWithFlowIntelligence(
       pair,
@@ -76,7 +71,6 @@ export function useFlowIntelligence(
     setResult(flowResult);
   }, [pair, signalDirection, trades, candles1h, livePrice]);
 
-  // pair değişirse VPIN sıfırla
   useEffect(() => {
     vpinRef.current = null;
     setResult(null);

@@ -15,6 +15,9 @@ import type { Candle, Timeframe } from "@/lib/okx/candles";
 
 type PairTfKey = `${Pair}_${Timeframe}`;
 
+/** Stable empty array — selector fallback olarak kullanılır, her render'da yeni referans üretmez */
+export const EMPTY_CANDLES: readonly Candle[] = Object.freeze([]);
+
 interface CandleStoreState {
   /** Anahtar: "BTC_4h", "ETH_1h", vs. */
   candles: Partial<Record<PairTfKey, Candle[]>>;

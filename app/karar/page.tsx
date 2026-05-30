@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useScoreStore } from "@/lib/store/scoreStore";
-import { useCandleStore } from "@/lib/store/candleStore";
+import { useCandleStore, EMPTY_CANDLES } from "@/lib/store/candleStore";
 import { useMarketStore } from "@/lib/store/marketStore";
 import { useAccountStore } from "@/lib/store/accountStore";
 import { useSettingsStore } from "@/lib/store/settingsStore";
@@ -42,8 +42,8 @@ export default function KararPage() {
   const computing = useScoreStore((s) => s.computing);
   const candles1hRaw = useCandleStore((s) => s.candles[`${activePair}_1h`]);
   const candles4hRaw = useCandleStore((s) => s.candles[`${activePair}_4h`]);
-  const candles1h = candles1hRaw ?? [];
-  const candles4h = candles4hRaw ?? [];
+  const candles1h = candles1hRaw ?? EMPTY_CANDLES;
+  const candles4h = candles4hRaw ?? EMPTY_CANDLES;
   const livePrice = useMarketStore((s) => s.prices[activePair]?.last ?? null);
   const balanceTotal = useAccountStore((s) => s.balanceTotal);
   const balanceFree = useAccountStore((s) => s.balanceFree);

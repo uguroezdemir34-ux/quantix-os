@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useMacroStore } from "@/lib/store/macroStore";
-import { useCandleStore } from "@/lib/store/candleStore";
+import { useCandleStore, EMPTY_CANDLES } from "@/lib/store/candleStore";
 import { MarketSummaryBanner } from "@/components/piyasa/MarketSummaryBanner";
 import { FearGreedGauge } from "@/components/piyasa/FearGreedGauge";
 import { DominanceCard } from "@/components/piyasa/DominanceCard";
@@ -26,12 +26,12 @@ export default function PiyasaPage() {
   const eth1hRaw = useCandleStore((s) => s.candles["ETH_1h"]);
   const eth4hRaw = useCandleStore((s) => s.candles["ETH_4h"]);
   const eth1dRaw = useCandleStore((s) => s.candles["ETH_1d"]);
-  const btc1h = btc1hRaw ?? [];
-  const btc4h = btc4hRaw ?? [];
-  const btc1d = btc1dRaw ?? [];
-  const eth1h = eth1hRaw ?? [];
-  const eth4h = eth4hRaw ?? [];
-  const eth1d = eth1dRaw ?? [];
+  const btc1h = btc1hRaw ?? EMPTY_CANDLES;
+  const btc4h = btc4hRaw ?? EMPTY_CANDLES;
+  const btc1d = btc1dRaw ?? EMPTY_CANDLES;
+  const eth1h = eth1hRaw ?? EMPTY_CANDLES;
+  const eth4h = eth4hRaw ?? EMPTY_CANDLES;
+  const eth1d = eth1dRaw ?? EMPTY_CANDLES;
 
   const btcMtf = useMemo(
     () =>

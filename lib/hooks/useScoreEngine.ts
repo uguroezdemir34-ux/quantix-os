@@ -1,16 +1,17 @@
 /**
- * SCORE ENGINE HOOK — candleStore + store'lardan ScoreInput oluşturup
+ * SCORE ENGINE HOOK — candleStore tetiklendiğinde ScoreInput oluşturup
  * computeScore çalıştırır, sonucu scoreStore'a yazar.
  *
- * - candleStore değiştiğinde (her 30s) yeniden hesaplar
- * - Her iki pair için paralel çalışır
+ * Render optimizasyonu:
+ *   - Yalnızca candleStore.candles değiştiğinde (her ~30s) hesaplar
+ *   - Diğer store'lar getState() ile okunur — subscription yok, re-render yok
  */
 
 "use client";
 
 import { useEffect } from "react";
 import { PAIRS } from "@/lib/constants/pairs";
-import { useCandleStore } from "@/lib/store/candleStore";
+import { useCandleStore, EMPTY_CANDLES } from "@/lib/store/candleStore";
 import { useMarketStore } from "@/lib/store/marketStore";
 import { useMacroStore } from "@/lib/store/macroStore";
 import { useRiskStore } from "@/lib/store/riskStore";
@@ -23,22 +24,25 @@ import { computeScore } from "@/lib/score/orchestrator";
 import type { Pair } from "@/lib/constants/pairs";
 
 export function useScoreEngine(): void {
-  const candleStore = useCandleStore();
-  const marketStore = useMarketStore();
-  const macroStore = useMacroStore();
-  const riskStore = useRiskStore();
-  const accountStore = useAccountStore();
-  const positionStore = usePositionStore();
-  const tradesStore = useTradesStore();
+  // Tek trigger: mum verisi değişimi (~30s). Diğer store'lar getState() ile okunur.
+  const candles = useCandleStore((s) => s.candles);
   const setResult = useScoreStore((s) => s.setResult);
 
   useEffect(() => {
     const now = Date.now();
 
+    // Snapshot — subscription yok, re-render tetiklemiyor
+    const marketStore = useMarketStore.getState();
+    const macroStore = useMacroStore.getState();
+    const riskStore = useRiskStore.getState();
+    const accountStore = useAccountStore.getState();
+    const positionStore = usePositionStore.getState();
+    const tradesStore = useTradesStore.getState();
+
     for (const pair of PAIRS) {
-      const candles4h = candleStore.candles[`${pair}_4h`] ?? [];
-      const candles1h = candleStore.candles[`${pair}_1h`] ?? [];
-      const candles15m = candleStore.candles[`${pair}_15m`] ?? [];
+      const candles4h = candles[`${pair}_4h`] ?? EMPTY_CANDLES;
+      const candles1h = candles[`${pair}_1h`] ?? EMPTY_CANDLES;
+      const candles15m = candles[`${pair}_15m`] ?? EMPTY_CANDLES;
 
       const livePrice = marketStore.prices[pair]?.last ?? null;
       const fg = macroStore.fgValue ?? 50;
@@ -77,9 +81,12 @@ export function useScoreEngine(): void {
       const input = composeScoreInput({
         pair,
         livePrice,
-        candles4h,
-        candles1h,
-        candles15m,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        candles4h: candles4h as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        candles1h: candles1h as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        candles15m: candles15m as any,
         fg,
         eventSkipUntil: null,
         btcCooldownUntil: riskStore.btcCooldownUntil || null,
@@ -101,14 +108,5 @@ export function useScoreEngine(): void {
         setResult(pair as Pair, result, now);
       }
     }
-  }, [
-    candleStore.candles,
-    marketStore.prices,
-    macroStore.fgValue,
-    macroStore.fundingBtc,
-    macroStore.fundingEth,
-    riskStore.btcCooldownUntil,
-    accountStore.drawdownProtocol,
-    tradesStore.trades,
-  ]);
+  }, [candles, setResult]);
 }
